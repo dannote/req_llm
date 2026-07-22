@@ -155,11 +155,11 @@ defmodule ReqLLM.OpenTelemetryTest do
     )
 
     assert_receive {:start_span, span, "chat gpt-5", start_attributes}
-    assert start_attributes[:"gen_ai.provider.name"] == "openai"
-    assert start_attributes[:"gen_ai.operation.name"] == "chat"
-    assert start_attributes[:"gen_ai.request.model"] == "gpt-5"
-    assert start_attributes[:"gen_ai.output.type"] == "text"
-    assert start_attributes[:"req_llm.request_id"] == request_id
+    assert start_attributes["gen_ai.provider.name"] == "openai"
+    assert start_attributes["gen_ai.operation.name"] == "chat"
+    assert start_attributes["gen_ai.request.model"] == "gpt-5"
+    assert start_attributes["gen_ai.output.type"] == "text"
+    assert start_attributes["req_llm.request_id"] == request_id
 
     :telemetry.execute(
       [:req_llm, :request, :stop],
@@ -168,11 +168,11 @@ defmodule ReqLLM.OpenTelemetryTest do
     )
 
     assert_receive {:set_attributes, ^span, stop_attributes}
-    assert stop_attributes[:"gen_ai.response.finish_reasons"] == ["stop"]
-    assert stop_attributes[:"gen_ai.usage.input_tokens"] == 21
-    assert stop_attributes[:"gen_ai.usage.output_tokens"] == 34
-    assert stop_attributes[:"gen_ai.usage.cache_read.input_tokens"] == 8
-    assert stop_attributes[:"gen_ai.usage.cache_creation.input_tokens"] == 5
+    assert stop_attributes["gen_ai.response.finish_reasons"] == ["stop"]
+    assert stop_attributes["gen_ai.usage.input_tokens"] == 21
+    assert stop_attributes["gen_ai.usage.output_tokens"] == 34
+    assert stop_attributes["gen_ai.usage.cache_read.input_tokens"] == 8
+    assert stop_attributes["gen_ai.usage.cache_creation.input_tokens"] == 5
     assert_receive {:end_span, ^span}
   end
 
@@ -195,8 +195,8 @@ defmodule ReqLLM.OpenTelemetryTest do
     )
 
     assert_receive {:start_span, span, "chat gemini-2.5-pro", start_attributes}
-    assert start_attributes[:"gen_ai.provider.name"] == "gcp.gen_ai"
-    assert start_attributes[:"gen_ai.output.type"] == "json"
+    assert start_attributes["gen_ai.provider.name"] == "gcp.gen_ai"
+    assert start_attributes["gen_ai.output.type"] == "json"
 
     error = RuntimeError.exception("request timed out")
 
@@ -214,11 +214,11 @@ defmodule ReqLLM.OpenTelemetryTest do
     )
 
     assert_receive {:set_attributes, ^span, exception_attributes}
-    assert exception_attributes[:"error.type"] == "RuntimeError"
-    assert exception_attributes[:"req_llm.request_id"] == request_id
-    assert_receive {:add_event, ^span, :exception, event_attributes}
-    assert event_attributes[:"exception.type"] == "RuntimeError"
-    assert event_attributes[:"exception.message"] == "request timed out"
+    assert exception_attributes["error.type"] == "RuntimeError"
+    assert exception_attributes["req_llm.request_id"] == request_id
+    assert_receive {:add_event, ^span, "exception", event_attributes}
+    assert event_attributes["exception.type"] == "RuntimeError"
+    assert event_attributes["exception.message"] == "request timed out"
     assert_receive {:set_status, ^span, :error, "request timed out"}
     assert_receive {:end_span, ^span}
   end
@@ -264,15 +264,15 @@ defmodule ReqLLM.OpenTelemetryTest do
     )
 
     assert_receive {:start_span, _span, "chat gpt-5", attributes}
-    assert attributes[:"gen_ai.request.temperature"] == 0.7
-    assert attributes[:"gen_ai.request.top_p"] == 0.95
-    assert attributes[:"gen_ai.request.max_tokens"] == 256
-    assert attributes[:"gen_ai.request.stop_sequences"] == ["END"]
-    assert attributes[:"gen_ai.request.seed"] == 42
-    assert attributes[:"gen_ai.request.stream"] == false
-    assert attributes[:"gen_ai.conversation.id"] == "session-abc"
-    assert attributes[:"server.address"] == "api.openai.com"
-    assert attributes[:"server.port"] == 443
+    assert attributes["gen_ai.request.temperature"] == 0.7
+    assert attributes["gen_ai.request.top_p"] == 0.95
+    assert attributes["gen_ai.request.max_tokens"] == 256
+    assert attributes["gen_ai.request.stop_sequences"] == ["END"]
+    assert attributes["gen_ai.request.seed"] == 42
+    assert attributes["gen_ai.request.stream"] == false
+    assert attributes["gen_ai.conversation.id"] == "session-abc"
+    assert attributes["server.address"] == "api.openai.com"
+    assert attributes["server.port"] == 443
   end
 
   test "emits gen_ai.request.choice.count when n is set" do
@@ -298,7 +298,7 @@ defmodule ReqLLM.OpenTelemetryTest do
     )
 
     assert_receive {:start_span, _span, _name, attributes}
-    assert attributes[:"gen_ai.request.choice.count"] == 3
+    assert attributes["gen_ai.request.choice.count"] == 3
   end
 
   test "emits gen_ai.embeddings.dimension.count for embedding responses" do
@@ -336,7 +336,7 @@ defmodule ReqLLM.OpenTelemetryTest do
     )
 
     assert_receive {:set_attributes, ^span, attributes}
-    assert attributes[:"gen_ai.embeddings.dimension.count"] == 1536
+    assert attributes["gen_ai.embeddings.dimension.count"] == 1536
   end
 
   test "emits reasoning output tokens when usage exposes them" do
@@ -373,7 +373,7 @@ defmodule ReqLLM.OpenTelemetryTest do
     )
 
     assert_receive {:set_attributes, ^span, attributes}
-    assert attributes[:"gen_ai.usage.reasoning.output_tokens"] == 64
+    assert attributes["gen_ai.usage.reasoning.output_tokens"] == 64
   end
 
   test "emits gen_ai.response.id and gen_ai.response.model when response payload is present" do
@@ -425,8 +425,8 @@ defmodule ReqLLM.OpenTelemetryTest do
     )
 
     assert_receive {:set_attributes, ^span, attributes}
-    assert attributes[:"gen_ai.response.id"] == "resp_42"
-    assert attributes[:"gen_ai.response.model"] == "gpt-5-2026-03-01"
+    assert attributes["gen_ai.response.id"] == "resp_42"
+    assert attributes["gen_ai.response.model"] == "gpt-5-2026-03-01"
   end
 
   test "marks span as error on stop with HTTP >= 400" do
@@ -464,7 +464,7 @@ defmodule ReqLLM.OpenTelemetryTest do
     )
 
     assert_receive {:set_attributes, ^span, stop_attrs}
-    assert stop_attrs[:"error.type"] == "503"
+    assert stop_attrs["error.type"] == "503"
     assert_receive {:set_status, ^span, :error, "HTTP 503"}
     assert_receive {:end_span, ^span}
   end
@@ -502,9 +502,9 @@ defmodule ReqLLM.OpenTelemetryTest do
       )
 
       assert_receive {:start_span, _span, _name, attributes}
-      refute Map.has_key?(attributes, :"gen_ai.input.messages")
-      refute Map.has_key?(attributes, :"gen_ai.system_instructions")
-      refute Map.has_key?(attributes, :"gen_ai.tool.definitions")
+      refute Map.has_key?(attributes, "gen_ai.input.messages")
+      refute Map.has_key?(attributes, "gen_ai.system_instructions")
+      refute Map.has_key?(attributes, "gen_ai.tool.definitions")
     end
 
     test "content: :attributes promotes messages, system_instructions, tool definitions onto the span" do
@@ -552,14 +552,14 @@ defmodule ReqLLM.OpenTelemetryTest do
 
       assert_receive {:start_span, _span, _name, attributes}
 
-      assert decode_all(attributes[:"gen_ai.system_instructions"]) == [
+      assert decode_all(attributes["gen_ai.system_instructions"]) == [
                %{"type" => "text", "content" => "be helpful"}
              ]
 
       assert [
                %{"role" => "user"},
                %{"role" => "assistant"}
-             ] = decode_all(attributes[:"gen_ai.input.messages"])
+             ] = decode_all(attributes["gen_ai.input.messages"])
 
       assert [
                %{
@@ -569,7 +569,7 @@ defmodule ReqLLM.OpenTelemetryTest do
                  "strict" => true,
                  "parameters" => %{"type" => "object"}
                }
-             ] = decode_all(attributes[:"gen_ai.tool.definitions"])
+             ] = decode_all(attributes["gen_ai.tool.definitions"])
     end
 
     test "content: :attributes attaches gen_ai.output.messages on stop" do
@@ -628,7 +628,7 @@ defmodule ReqLLM.OpenTelemetryTest do
 
       assert_receive {:set_attributes, ^span, attributes}
 
-      assert decode_all(attributes[:"gen_ai.output.messages"]) == [
+      assert decode_all(attributes["gen_ai.output.messages"]) == [
                %{
                  "role" => "assistant",
                  "parts" => [%{"type" => "text", "content" => "hi back"}],
@@ -670,8 +670,8 @@ defmodule ReqLLM.OpenTelemetryTest do
       )
 
       assert_receive {:start_span, span, _name, start_attrs}
-      refute Map.has_key?(start_attrs, :"gen_ai.input.messages")
-      refute Map.has_key?(start_attrs, :"gen_ai.system_instructions")
+      refute Map.has_key?(start_attrs, "gen_ai.input.messages")
+      refute Map.has_key?(start_attrs, "gen_ai.system_instructions")
 
       :telemetry.execute(
         [:req_llm, :request, :stop],
@@ -709,26 +709,25 @@ defmodule ReqLLM.OpenTelemetryTest do
       )
 
       assert_receive {:set_attributes, ^span, stop_attrs}
-      refute Map.has_key?(stop_attrs, :"gen_ai.input.messages")
-      refute Map.has_key?(stop_attrs, :"gen_ai.output.messages")
+      refute Map.has_key?(stop_attrs, "gen_ai.input.messages")
+      refute Map.has_key?(stop_attrs, "gen_ai.output.messages")
 
-      assert_receive {:add_event, ^span, :"gen_ai.client.inference.operation.details",
-                      event_attrs}
+      assert_receive {:add_event, ^span, "gen_ai.client.inference.operation.details", event_attrs}
 
-      assert event_attrs[:"gen_ai.operation.name"] == "chat"
-      assert event_attrs[:"gen_ai.provider.name"] == "openai"
-      assert event_attrs[:"gen_ai.request.model"] == "gpt-5"
-      assert event_attrs[:"gen_ai.response.finish_reasons"] == ["stop"]
+      assert event_attrs["gen_ai.operation.name"] == "chat"
+      assert event_attrs["gen_ai.provider.name"] == "openai"
+      assert event_attrs["gen_ai.request.model"] == "gpt-5"
+      assert event_attrs["gen_ai.response.finish_reasons"] == ["stop"]
 
-      assert event_attrs[:"gen_ai.system_instructions"] == [
+      assert event_attrs["gen_ai.system_instructions"] == [
                %{"type" => "text", "content" => "be helpful"}
              ]
 
-      assert [%{"role" => "user"}] = event_attrs[:"gen_ai.input.messages"]
+      assert [%{"role" => "user"}] = event_attrs["gen_ai.input.messages"]
 
-      assert [%{"role" => "assistant"}] = event_attrs[:"gen_ai.output.messages"]
-      refute Enum.any?(event_attrs[:"gen_ai.input.messages"], &is_binary/1)
-      refute Enum.any?(event_attrs[:"gen_ai.output.messages"], &is_binary/1)
+      assert [%{"role" => "assistant"}] = event_attrs["gen_ai.output.messages"]
+      refute Enum.any?(event_attrs["gen_ai.input.messages"], &is_binary/1)
+      refute Enum.any?(event_attrs["gen_ai.output.messages"], &is_binary/1)
     end
 
     test "content: true is accepted as an alias for :attributes" do
@@ -761,7 +760,7 @@ defmodule ReqLLM.OpenTelemetryTest do
       )
 
       assert_receive {:start_span, _span, _name, attributes}
-      assert [%{"role" => "user"}] = decode_all(attributes[:"gen_ai.input.messages"])
+      assert [%{"role" => "user"}] = decode_all(attributes["gen_ai.input.messages"])
     end
   end
 
@@ -876,7 +875,7 @@ defmodule ReqLLM.OpenTelemetryTest do
       )
 
       assert_receive {:set_attributes, _span, attributes}
-      assert_in_delta(attributes[:"gen_ai.response.time_to_first_chunk"], 0.15, 0.001)
+      assert_in_delta(attributes["gen_ai.response.time_to_first_chunk"], 0.15, 0.001)
 
       records = drain_records(model.id)
 
@@ -993,8 +992,8 @@ defmodule ReqLLM.OpenTelemetryTest do
       )
 
       assert_receive {:set_attributes, ^span, attrs}
-      assert attrs[:"gen_ai.usage.cost"] == 0.003
-      refute Map.has_key?(attrs, :"langfuse.observation.cost_details")
+      assert attrs["gen_ai.usage.cost"] == 0.003
+      refute Map.has_key?(attrs, "langfuse.observation.cost_details")
     end
 
     test "skips gen_ai.usage.cost when total_cost is missing" do
@@ -1028,7 +1027,7 @@ defmodule ReqLLM.OpenTelemetryTest do
       )
 
       assert_receive {:set_attributes, ^span, attrs}
-      refute Map.has_key?(attrs, :"gen_ai.usage.cost")
+      refute Map.has_key?(attrs, "gen_ai.usage.cost")
     end
 
     test "langfuse: true adds langfuse.observation.cost_details JSON" do
@@ -1075,9 +1074,9 @@ defmodule ReqLLM.OpenTelemetryTest do
       )
 
       assert_receive {:set_attributes, ^span, attrs}
-      assert attrs[:"gen_ai.usage.cost"] == 0.0035
+      assert attrs["gen_ai.usage.cost"] == 0.0035
 
-      assert {:ok, decoded} = Jason.decode(attrs[:"langfuse.observation.cost_details"])
+      assert {:ok, decoded} = Jason.decode(attrs["langfuse.observation.cost_details"])
 
       assert decoded == %{
                "input" => 0.001,
@@ -1112,8 +1111,8 @@ defmodule ReqLLM.OpenTelemetryTest do
       )
 
       assert_receive {:start_span, _span, _name, attrs}
-      assert attrs[:"openai.api.type"] == "chat_completions"
-      assert attrs[:"openai.request.service_tier"] == "priority"
+      assert attrs["openai.api.type"] == "chat_completions"
+      assert attrs["openai.request.service_tier"] == "priority"
     end
 
     test "emits openai.response.{service_tier,system_fingerprint} on stop" do
@@ -1153,8 +1152,8 @@ defmodule ReqLLM.OpenTelemetryTest do
       )
 
       assert_receive {:set_attributes, ^span, attrs}
-      assert attrs[:"openai.response.service_tier"] == "default"
-      assert attrs[:"openai.response.system_fingerprint"] == "fp_abc123"
+      assert attrs["openai.response.service_tier"] == "default"
+      assert attrs["openai.response.system_fingerprint"] == "fp_abc123"
     end
 
     test "skips openai.* attributes for non-OpenAI providers" do
@@ -1180,8 +1179,8 @@ defmodule ReqLLM.OpenTelemetryTest do
       )
 
       assert_receive {:start_span, _span, _name, attrs}
-      refute Map.has_key?(attrs, :"openai.api.type")
-      refute Map.has_key?(attrs, :"openai.request.service_tier")
+      refute Map.has_key?(attrs, "openai.api.type")
+      refute Map.has_key?(attrs, "openai.request.service_tier")
     end
   end
 

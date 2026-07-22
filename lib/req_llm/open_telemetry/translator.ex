@@ -6,9 +6,8 @@ defmodule ReqLLM.OpenTelemetry.Translator do
   # bridge stay a thin shell while the mapper remains the single source
   # of truth for span shape (attributes, events, status, metrics).
   #
-  # Atomization of attribute and event-name keys happens here so the
-  # mapper can keep returning binary keys (which dep-free callers can
-  # hand straight to any tracer SDK).
+  # Binary attribute keys and event names pass through unchanged, matching
+  # the OpenTelemetry API and the dependency-free mapper's output.
 
   @doc """
   Starts a span from a `Mapper.request_start/2` stub. Emits any pre-start
@@ -16,7 +15,7 @@ defmodule ReqLLM.OpenTelemetry.Translator do
   """
   @spec apply_start(map(), module(), keyword()) :: term()
   def apply_start(stub, adapter, config) do
-    span = adapter.start_span(stub.name, atomize(stub.attributes), config)
+    span = adapter.start_span(stub.name, stub.attributes, config)
     Enum.each(stub.events, &emit_event(adapter, span, &1, config))
     span
   end
@@ -30,7 +29,7 @@ defmodule ReqLLM.OpenTelemetry.Translator do
   """
   @spec apply_terminal(term(), map(), module(), keyword()) :: :ok
   def apply_terminal(span, stub, adapter, config) do
-    adapter.set_attributes(span, atomize(stub.attributes), config)
+    adapter.set_attributes(span, stub.attributes, config)
     Enum.each(stub.events, &emit_event(adapter, span, &1, config))
     Enum.each(Map.get(stub, :tool_spans, []), &emit_tool_span(span, &1, adapter, config))
     apply_status(span, stub.status, adapter, config)
@@ -39,7 +38,7 @@ defmodule ReqLLM.OpenTelemetry.Translator do
   end
 
   defp emit_event(adapter, span, %{name: name, attributes: attrs}, config) do
-    adapter.add_event(span, atomize_name(name), atomize(attrs), config)
+    adapter.add_event(span, name, attrs, config)
   end
 
   # Emits a `gen_ai.execute_tool` sub-span as a child of `parent`. The
@@ -50,7 +49,7 @@ defmodule ReqLLM.OpenTelemetry.Translator do
   # the measured-duration timestamps.
   defp emit_tool_span(parent, stub, adapter, config) do
     name = stub.name
-    attrs = atomize(stub.attributes)
+    attrs = stub.attributes
     start_opts = build_start_opts(stub)
 
     child =
@@ -98,18 +97,4 @@ defmodule ReqLLM.OpenTelemetry.Translator do
   end
 
   defp record_metrics(_records, _adapter, _config), do: :ok
-
-  # Keys/names come from the closed `gen_ai.*` / `server.*` / `error.*` /
-  # `req_llm.*` / `openai.*` / `langfuse.*` set defined in `Attributes`,
-  # `Content`, `Metrics`, and `Shared` — not caller-supplied — so
-  # `String.to_atom/1` is safe. Do not feed user input here.
-  defp atomize(map) when is_map(map) do
-    Map.new(map, fn
-      {key, value} when is_atom(key) -> {key, value}
-      {key, value} when is_binary(key) -> {String.to_atom(key), value}
-    end)
-  end
-
-  defp atomize_name(name) when is_atom(name), do: name
-  defp atomize_name(name) when is_binary(name), do: String.to_atom(name)
 end

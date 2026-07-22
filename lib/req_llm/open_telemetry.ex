@@ -239,12 +239,7 @@ defmodule ReqLLM.OpenTelemetry.OTelAdapter do
     instrument = ensure_instrument(record)
     ctx = call(:otel_ctx, :get_current, [])
 
-    call(:otel_histogram, :record, [
-      ctx,
-      instrument,
-      record.value,
-      atomize_keys(record.attributes)
-    ])
+    call(:otel_histogram, :record, [ctx, instrument, record.value, record.attributes])
 
     :ok
   end
@@ -310,17 +305,7 @@ defmodule ReqLLM.OpenTelemetry.OTelAdapter do
   end
 
   defp otel_instrument_name(name) when is_atom(name), do: name
-  defp otel_instrument_name(name), do: String.to_atom(name)
-
-  # Keys come from the closed `gen_ai.*` / `server.*` / `error.*` set defined in
-  # `ReqLLM.OpenTelemetry.{Attributes,Content,Metrics}` — not from caller-supplied
-  # input — so `String.to_atom/1` is safe here. Do not pass user-supplied keys through.
-  defp atomize_keys(map) when is_map(map) do
-    Map.new(map, fn
-      {key, value} when is_atom(key) -> {key, value}
-      {key, value} when is_binary(key) -> {String.to_atom(key), value}
-    end)
-  end
+  defp otel_instrument_name(name), do: String.to_existing_atom(name)
 
   defp meter do
     call(

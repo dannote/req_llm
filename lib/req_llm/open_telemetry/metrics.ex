@@ -91,10 +91,10 @@ defmodule ReqLLM.OpenTelemetry.Metrics do
     67_108_864
   ]
 
-  @duration_metric "gen_ai.client.operation.duration"
-  @token_metric "gen_ai.client.token.usage"
-  @ttfc_metric "gen_ai.client.operation.time_to_first_chunk"
-  @tpoc_metric "gen_ai.client.operation.time_per_output_chunk"
+  @duration_metric :"gen_ai.client.operation.duration"
+  @token_metric :"gen_ai.client.token.usage"
+  @ttfc_metric :"gen_ai.client.operation.time_to_first_chunk"
+  @tpoc_metric :"gen_ai.client.operation.time_per_output_chunk"
 
   @type histogram_record :: %{
           name: String.t(),
@@ -149,7 +149,7 @@ defmodule ReqLLM.OpenTelemetry.Metrics do
 
   defp duration_record(duration_seconds, attributes) do
     %{
-      name: @duration_metric,
+      name: Atom.to_string(@duration_metric),
       value: duration_seconds,
       unit: "s",
       description: "GenAI operation duration.",
@@ -165,7 +165,7 @@ defmodule ReqLLM.OpenTelemetry.Metrics do
 
         Enum.map(tokens, fn {type, value} ->
           %{
-            name: @token_metric,
+            name: Atom.to_string(@token_metric),
             value: value,
             unit: "{token}",
             description: "Measures number of input and output tokens used.",
@@ -188,7 +188,7 @@ defmodule ReqLLM.OpenTelemetry.Metrics do
         [
           ttfc &&
             %{
-              name: @ttfc_metric,
+              name: Atom.to_string(@ttfc_metric),
               value: ttfc,
               unit: "s",
               description: "Time to first content chunk in a streaming GenAI operation.",
@@ -197,7 +197,7 @@ defmodule ReqLLM.OpenTelemetry.Metrics do
             },
           tpoc &&
             %{
-              name: @tpoc_metric,
+              name: Atom.to_string(@tpoc_metric),
               value: tpoc,
               unit: "s",
               description: "Time per output chunk in a streaming GenAI operation.",

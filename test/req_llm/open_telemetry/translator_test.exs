@@ -152,7 +152,7 @@ defmodule ReqLLM.OpenTelemetry.TranslatorTest do
   end
 
   describe "apply_start/3" do
-    test "atomizes string-keyed attributes" do
+    test "preserves string-keyed attributes" do
       stub = %{
         name: "chat gpt-5",
         attributes: %{"gen_ai.request.model" => "gpt-5", "server.port" => 443},
@@ -162,24 +162,33 @@ defmodule ReqLLM.OpenTelemetry.TranslatorTest do
       assert :span_handle = Translator.apply_start(stub, FakeAdapter, test_pid: self())
 
       assert_receive {:start_span, attrs}
-      assert attrs[:"gen_ai.request.model"] == "gpt-5"
-      assert attrs[:"server.port"] == 443
+      assert attrs["gen_ai.request.model"] == "gpt-5"
+      assert attrs["server.port"] == 443
     end
 
-    test "emits any start-time events in list order" do
+    test "emits any start-time events in list order without atomizing unknown names" do
+      unique = System.unique_integer([:positive])
+      event_name = "req_llm.unknown_event_#{unique}"
+      attribute_name = "req_llm.unknown_attribute_#{unique}"
+
+      assert_raise ArgumentError, fn -> String.to_existing_atom(event_name) end
+      assert_raise ArgumentError, fn -> String.to_existing_atom(attribute_name) end
+
       stub = %{
         name: "chat gpt-5",
         attributes: %{},
         events: [
-          %{name: "early.event", attributes: %{"foo" => "bar"}}
+          %{name: event_name, attributes: %{attribute_name => "bar"}}
         ]
       }
 
       Translator.apply_start(stub, FakeAdapter, test_pid: self())
 
       assert_receive {:start_span, _}
-      assert_receive {:add_event, :span_handle, :"early.event", attrs}
-      assert attrs[:foo] == "bar"
+      assert_receive {:add_event, :span_handle, ^event_name, attrs}
+      assert attrs[attribute_name] == "bar"
+      assert_raise ArgumentError, fn -> String.to_existing_atom(event_name) end
+      assert_raise ArgumentError, fn -> String.to_existing_atom(attribute_name) end
     end
   end
 
@@ -195,7 +204,7 @@ defmodule ReqLLM.OpenTelemetry.TranslatorTest do
       Translator.apply_terminal(:span_handle, stub, FakeAdapter, test_pid: self())
 
       assert_receive {:set_attributes, :span_handle, attrs}
-      assert attrs[:"gen_ai.usage.input_tokens"] == 10
+      assert attrs["gen_ai.usage.input_tokens"] == 10
 
       refute_received {:set_status, _, _, _}
       assert_receive {:end_span, :span_handle}
@@ -230,8 +239,8 @@ defmodule ReqLLM.OpenTelemetry.TranslatorTest do
       Translator.apply_terminal(:span_handle, stub, FakeAdapter, test_pid: self())
 
       # Capture events in order
-      assert_receive {:add_event, _, :exception, _}
-      assert_receive {:add_event, _, :"gen_ai.client.inference.operation.details", _}
+      assert_receive {:add_event, _, "exception", _}
+      assert_receive {:add_event, _, "gen_ai.client.inference.operation.details", _}
       assert_receive {:set_status, _, :error, "boom"}
       assert_receive {:end_span, _}
     end
@@ -264,8 +273,8 @@ defmodule ReqLLM.OpenTelemetry.TranslatorTest do
       assert_receive {:start_child_span, :parent_span, "execute_tool web_search_call", attrs,
                       opts}
 
-      assert attrs[:"gen_ai.operation.name"] == "execute_tool"
-      assert attrs[:"gen_ai.tool.name"] == "web_search_call"
+      assert attrs["gen_ai.operation.name"] == "execute_tool"
+      assert attrs["gen_ai.tool.name"] == "web_search_call"
       assert opts == %{kind: :internal, start_time: 1_000}
       refute_received {:set_status, :child_span_handle, _, _}
       assert_receive {:end_span_at, :child_span_handle, 2_000}

@@ -23,9 +23,9 @@ defmodule ReqLLM.OpenTelemetry.Attributes do
   usage, embedding dims, OpenAI extension fields, streaming TTFC).
   `exception/1` and `exception_event/1` cover the error path.
 
-  Keys are binary spec names; the live bridge atomizes them at the adapter
-  boundary. `nil` and empty-list values are dropped so OTel backends never
-  see blank-but-present attributes.
+  Keys are binary spec names, as supported by OpenTelemetry's attribute API.
+  `nil` and empty-list values are dropped so OTel backends never see
+  blank-but-present attributes.
   """
 
   alias ReqLLM.MapAccess
@@ -36,8 +36,7 @@ defmodule ReqLLM.OpenTelemetry.Attributes do
   Builds GenAI span start attributes from request lifecycle metadata.
 
   The returned map uses binary attribute names as defined by the OpenTelemetry
-  GenAI semantic conventions. Callers that need atom-keyed maps (e.g. the live
-  bridge) atomize at the adapter boundary.
+  GenAI semantic conventions.
   """
   @spec start(map()) :: %{optional(String.t()) => term()}
   def start(metadata) do
