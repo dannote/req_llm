@@ -726,7 +726,7 @@ defmodule ReqLLM.Providers.XAITest do
       {translated_opts, warnings} = XAI.translate_options(:chat, model, opts)
 
       xai_tools = Keyword.get(translated_opts, :xai_tools, [])
-      assert Enum.any?(xai_tools, fn tool -> tool["type"] == "web_search" end)
+      assert Enum.any?(xai_tools, fn tool -> tool.type == "web_search" end)
       refute Keyword.has_key?(translated_opts, :web_search_options)
       assert length(warnings) == 1
     end

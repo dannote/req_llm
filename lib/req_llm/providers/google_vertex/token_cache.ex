@@ -38,8 +38,6 @@ defmodule ReqLLM.Providers.GoogleVertex.TokenCache do
 
   use GenServer
 
-  alias ReqLLM.Provider.Utils
-
   require Logger
 
   @table_name :vertex_oauth2_tokens
@@ -62,6 +60,8 @@ defmodule ReqLLM.Providers.GoogleVertex.TokenCache do
   - `:adc` - uses Application Default Credentials
   - `{:service_account, credentials}` - uses explicit service account credentials
   - Legacy service account credentials directly
+
+  Pre-parsed service account maps must use the string keys from Google's JSON format.
 
   ## Examples
 
@@ -211,9 +211,7 @@ defmodule ReqLLM.Providers.GoogleVertex.TokenCache do
   end
 
   defp service_account_cache_key(service_account) when is_map(service_account) do
-    normalized = Utils.stringify_keys(service_account)
-
-    case normalized["client_email"] do
+    case service_account["client_email"] do
       email when is_binary(email) and email != "" -> {:ok, email}
       _ -> {:error, "Invalid service account credentials: missing client_email"}
     end

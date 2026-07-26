@@ -144,15 +144,6 @@ defmodule ReqLLM.Providers.GoogleVertex.TokenCacheTest do
       assert {:error, _reason} = result
     end
 
-    test "handles map with atom keys" do
-      # Users might pass atom keys instead of string keys
-      map = %{client_email: "test@example.com"}
-
-      result = TokenCache.get_or_refresh(map)
-      # Should normalize keys and fail in JWT signing (no private_key)
-      assert {:error, _reason} = result
-    end
-
     test "parses JSON string when not a file path" do
       # Non-existent file path that is valid JSON gets parsed as JSON
       json_string = ~s({"client_email": "test@example.com"})
@@ -193,22 +184,6 @@ defmodule ReqLLM.Providers.GoogleVertex.TokenCacheTest do
       {:ok, map} = service_account_path |> File.read!() |> Jason.decode()
 
       assert {:ok, token} = TokenCache.get_or_refresh(map)
-      assert is_binary(token)
-      assert String.starts_with?(token, "ya29.")
-    end
-
-    @tag :skip
-    test "fetches token with map using atom keys" do
-      service_account_path = System.get_env("GOOGLE_SERVICE_ACCOUNT_JSON")
-      assert service_account_path, "GOOGLE_SERVICE_ACCOUNT_JSON env var required"
-      assert File.exists?(service_account_path), "File not found: #{service_account_path}"
-
-      {:ok, string_map} = service_account_path |> File.read!() |> Jason.decode()
-
-      # Convert to atom keys
-      atom_map = Map.new(string_map, fn {k, v} -> {String.to_atom(k), v} end)
-
-      assert {:ok, token} = TokenCache.get_or_refresh(atom_map)
       assert is_binary(token)
       assert String.starts_with?(token, "ya29.")
     end
@@ -346,16 +321,6 @@ defmodule ReqLLM.Providers.GoogleVertex.TokenCacheTest do
 
       # Should be able to invalidate by client_email
       assert :ok = TokenCache.invalidate("map-test@example.com")
-    end
-
-    test "map with atom keys normalizes to string keys" do
-      map = %{client_email: "atom-test@example.com", private_key: "invalid"}
-
-      # First call - will fail at JWT signing
-      {:error, _} = TokenCache.get_or_refresh(map)
-
-      # Should be able to invalidate by client_email (string)
-      assert :ok = TokenCache.invalidate("atom-test@example.com")
     end
   end
 end

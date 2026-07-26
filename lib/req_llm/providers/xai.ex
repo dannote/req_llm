@@ -105,7 +105,7 @@ defmodule ReqLLM.Providers.XAI do
   use ReqLLM.Provider.Defaults
 
   import ReqLLM.Provider.Utils,
-    only: [maybe_put: 3, maybe_put_skip: 4, ensure_parsed_body: 1, stringify_keys: 1]
+    only: [maybe_put: 3, maybe_put_skip: 4, ensure_parsed_body: 1]
 
   @provider_schema [
     max_completion_tokens: [
@@ -397,7 +397,7 @@ defmodule ReqLLM.Providers.XAI do
   end
 
   defp built_in_tool?(tool) do
-    normalize_tool_type(Map.get(tool, :type)) in ["web_search", "x_search"]
+    Map.get(tool, :type) in ["web_search", "x_search"]
   end
 
   defp ensure_min_tokens(model, opts) do
@@ -882,61 +882,31 @@ defmodule ReqLLM.Providers.XAI do
   defp split_xai_tools(nil), do: {[], []}
 
   defp split_xai_tools(tools) when is_list(tools) do
-    tools =
-      Enum.reject(tools, fn tool ->
-        tool_type = normalize_tool_type(Map.get(tool, :type))
-        tool_type == "live_search"
-      end)
-
-    {xai_tools, other_tools} = Enum.split_with(tools, &xai_tool_entry?/1)
-    {normalize_xai_tools(xai_tools), other_tools}
+    tools
+    |> Enum.reject(&live_search_tool?/1)
+    |> Enum.split_with(&xai_tool_entry?/1)
   end
 
   defp split_xai_tools(tool), do: split_xai_tools([tool])
 
-  defp xai_tool_entry?(%{} = tool) do
-    tool_type = normalize_tool_type(Map.get(tool, :type))
-    tool_type in ["web_search", "x_search"]
-  end
-
+  defp xai_tool_entry?(%{type: type}) when type in ["web_search", "x_search"], do: true
   defp xai_tool_entry?(_), do: false
 
-  defp normalize_tool_type(type) when is_atom(type), do: Atom.to_string(type)
-  defp normalize_tool_type(type) when is_binary(type), do: type
-  defp normalize_tool_type(_), do: nil
-
-  defp normalize_xai_tools(tools) do
+  defp supported_xai_tools(tools) do
     tools
     |> List.wrap()
-    |> Enum.filter(&is_map/1)
-    |> Enum.map(&normalize_xai_tool/1)
-    |> Enum.reject(&live_search_tool?/1)
+    |> Enum.filter(&xai_tool_entry?/1)
   end
 
-  defp live_search_tool?(%{} = tool) do
-    tool_type = normalize_tool_type(Map.get(tool, :type))
-    tool_type == "live_search"
-  end
-
+  defp live_search_tool?(%{type: "live_search"}), do: true
   defp live_search_tool?(_), do: false
-
-  defp normalize_xai_tool(tool) do
-    normalized = stringify_keys(tool)
-    tool_type = normalize_tool_type(Map.get(normalized, "type"))
-
-    if is_binary(tool_type) do
-      Map.put(normalized, "type", tool_type)
-    else
-      normalized
-    end
-  end
 
   defp maybe_add_web_search_tool(xai_tools, search_parameters, web_search_options, warnings) do
     if search_parameters != nil or web_search_options != nil do
       warning =
         "search_parameters is deprecated. Use xai_tools with %{type: \"web_search\"} instead."
 
-      updated_tools = ensure_xai_tool(xai_tools, %{"type" => "web_search"})
+      updated_tools = ensure_xai_tool(xai_tools, %{type: "web_search"})
       {updated_tools, [warning | warnings]}
     else
       {xai_tools, warnings}
@@ -944,20 +914,18 @@ defmodule ReqLLM.Providers.XAI do
   end
 
   defp ensure_xai_tool(xai_tools, tool) do
-    normalized = normalize_xai_tools(xai_tools)
-    normalized_tool = normalize_xai_tool(tool)
-    tool_type = normalize_tool_type(Map.get(normalized_tool, "type"))
+    normalized = supported_xai_tools(xai_tools)
 
-    if Enum.any?(normalized, fn existing -> Map.get(existing, "type") == tool_type end) do
+    if Enum.any?(normalized, fn existing -> existing.type == tool.type end) do
       normalized
     else
-      normalized ++ [normalized_tool]
+      normalized ++ [tool]
     end
   end
 
   defp merge_xai_tools(existing, xai_tools) do
     existing_tools = List.wrap(existing)
-    new_tools = normalize_xai_tools(xai_tools)
+    new_tools = supported_xai_tools(xai_tools)
 
     case {existing_tools, new_tools} do
       {[], []} -> nil
@@ -1045,7 +1013,7 @@ defmodule ReqLLM.Providers.XAI do
   defp merge_xai_tools_for_responses(%Req.Request{} = request) do
     opts = request.options
     tools = List.wrap(opts_get(opts, :tools, []))
-    xai_tools = normalize_xai_tools(opts_get(opts, :xai_tools, []))
+    xai_tools = supported_xai_tools(opts_get(opts, :xai_tools, []))
     merged_tools = tools ++ xai_tools
 
     opts =

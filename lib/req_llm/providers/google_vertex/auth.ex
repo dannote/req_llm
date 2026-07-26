@@ -22,7 +22,7 @@ defmodule ReqLLM.Providers.GoogleVertex.Auth do
   Accepts credentials in multiple formats:
   - File path (string) - if file exists, reads and parses JSON file
   - JSON string (string) - if not a file, parses as JSON directly
-  - Map - uses as-is (already parsed, normalizes atom keys to strings)
+  - String-keyed map - uses an already parsed service account JSON object
 
   Generates a fresh token on each call. Tokens are valid for 1 hour.
 
@@ -102,7 +102,7 @@ defmodule ReqLLM.Providers.GoogleVertex.Auth do
   end
 
   defp read_service_account(service_account) when is_map(service_account) do
-    {:ok, Utils.stringify_keys(service_account)}
+    {:ok, service_account}
   end
 
   defp read_service_account(path_or_json) when is_binary(path_or_json) do
