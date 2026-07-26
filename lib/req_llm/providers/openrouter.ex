@@ -756,15 +756,7 @@ defmodule ReqLLM.Providers.OpenRouter do
     |> maybe_put(:temperature, option_value(opts, :temperature))
   end
 
-  defp option_value(opts, key) when is_list(opts) do
-    if Keyword.keyword?(opts), do: Keyword.get(opts, key), else: nil
-  end
-
-  defp option_value(opts, key) when is_map(opts) do
-    Map.get(opts, key) || Map.get(opts, Atom.to_string(key))
-  end
-
-  defp option_value(_opts, _key), do: nil
+  defp option_value(opts, key), do: Keyword.get(opts, key)
 
   # Helper function for adding OpenRouter-specific body options not covered by defaults
   defp add_openrouter_specific_options(body, request_options) do

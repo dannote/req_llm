@@ -51,12 +51,7 @@ defmodule ReqLLM.RequestPlan do
              model,
              merged_opts
            ),
-         {:ok, flat_opts} <-
-           ReqLLM.Provider.Options.normalize_flat_provider_options(
-             provider_module,
-             namespaced_opts
-           ),
-         normalized_opts <- normalize_options(flat_opts),
+         normalized_opts <- normalize_options(namespaced_opts),
          {:ok, surface, api_module, surface_warnings} <-
            resolve_surface(model, provider_module),
          {:ok, transport, transport_warnings} <-

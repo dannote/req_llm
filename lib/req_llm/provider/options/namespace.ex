@@ -59,18 +59,20 @@ defmodule ReqLLM.Provider.Options.Namespace do
            ) do
       {:ok, normalized, warnings}
     else
-      :legacy -> {:ok, opts, []}
       {:error, error} -> {:error, error}
     end
   end
 
-  defp container_entries(options) when is_map(options), do: {:ok, Map.to_list(options)}
-
   defp container_entries(options) when is_list(options) do
-    if Keyword.keyword?(options), do: {:ok, options}, else: :legacy
+    if Keyword.keyword?(options) do
+      {:ok, options}
+    else
+      invalid_parameter("provider_options must be a keyword list")
+    end
   end
 
-  defp container_entries(_options), do: :legacy
+  defp container_entries(_options),
+    do: invalid_parameter("provider_options must be a keyword list")
 
   defp classify_entries(entries, provider, schema_keys) do
     known_providers = known_provider_ids(provider)
@@ -120,18 +122,16 @@ defmodule ReqLLM.Provider.Options.Namespace do
     schema_keys = provider_schema_keys(provider_mod)
 
     with {:ok, namespace_entries} <- namespace_entries(namespace, provider),
-         {:ok, normalized_namespace} <-
-           normalize_option_entries(namespace_entries, schema_keys, operation, provider),
-         {:ok, normalized_flat} <-
-           normalize_option_entries(flat, schema_keys, operation, provider),
-         :ok <- reject_duplicate_keys(normalized_namespace, provider),
-         :ok <- reject_duplicate_keys(normalized_flat, provider) do
-      provider_collisions = colliding_keys(normalized_flat, normalized_namespace)
+         :ok <- validate_option_entries(namespace_entries, schema_keys, operation, provider),
+         :ok <- validate_option_entries(flat, schema_keys, operation, provider),
+         :ok <- reject_duplicate_keys(namespace_entries, provider),
+         :ok <- reject_duplicate_keys(flat, provider) do
+      provider_collisions = colliding_keys(flat, namespace_entries)
 
       merged_before_canonical =
-        normalized_flat
+        flat
         |> remove_keys(provider_collisions)
-        |> Kernel.++(normalized_namespace)
+        |> Kernel.++(namespace_entries)
 
       {merged, canonical_collisions} =
         remove_canonical_collisions(merged_before_canonical, operation, opts)
@@ -139,15 +139,12 @@ defmodule ReqLLM.Provider.Options.Namespace do
       normalized_opts = Keyword.put(opts, :provider_options, merged)
 
       warnings =
-        mixed_shape_warnings(provider, normalized_flat, provider_collisions) ++
+        mixed_shape_warnings(provider, flat, provider_collisions) ++
           canonical_collision_warnings(provider, canonical_collisions)
 
       {:ok, normalized_opts, warnings}
     end
   end
-
-  defp namespace_entries(namespace, _provider) when is_map(namespace),
-    do: {:ok, Map.to_list(namespace)}
 
   defp namespace_entries(namespace, provider) when is_list(namespace) do
     if Keyword.keyword?(namespace) do
@@ -159,46 +156,24 @@ defmodule ReqLLM.Provider.Options.Namespace do
 
   defp namespace_entries(_namespace, provider), do: invalid_namespace_structure(provider)
 
-  defp normalize_option_entries(entries, schema_keys, operation, provider) do
+  defp validate_option_entries(entries, schema_keys, operation, provider) do
     canonical_keys = canonical_option_keys(operation)
-    schema_names = Map.new(schema_keys, &{Atom.to_string(&1), &1})
 
-    entries
-    |> Enum.reduce_while([], fn {key, value}, normalized ->
-      case normalize_option_key(key, schema_keys, schema_names, canonical_keys, provider) do
-        {:ok, normalized_key} -> {:cont, [{normalized_key, value} | normalized]}
-        {:error, error} -> {:halt, {:error, error}}
+    Enum.reduce_while(entries, :ok, fn {key, _value}, :ok ->
+      cond do
+        key in schema_keys ->
+          {:cont, :ok}
+
+        schema_keys == [] ->
+          {:cont, :ok}
+
+        key in canonical_keys ->
+          {:halt, canonical_option_error(key)}
+
+        true ->
+          {:halt, unknown_provider_option(key, provider)}
       end
     end)
-    |> case do
-      {:error, error} -> {:error, error}
-      normalized -> {:ok, Enum.reverse(normalized)}
-    end
-  end
-
-  defp normalize_option_key(key, schema_keys, schema_names, canonical_keys, provider) do
-    cond do
-      is_atom(key) and key in schema_keys ->
-        {:ok, key}
-
-      is_atom(key) and schema_keys == [] ->
-        {:ok, key}
-
-      is_binary(key) and Map.has_key?(schema_names, key) ->
-        {:ok, Map.fetch!(schema_names, key)}
-
-      is_atom(key) and key in canonical_keys ->
-        canonical_option_error(key)
-
-      is_binary(key) ->
-        case Enum.find(canonical_keys, &(Atom.to_string(&1) == key)) do
-          nil -> unknown_provider_option(key, provider)
-          canonical -> canonical_option_error(canonical)
-        end
-
-      true ->
-        unknown_provider_option(key, provider)
-    end
   end
 
   defp canonical_option_error(key) do
@@ -333,16 +308,9 @@ defmodule ReqLLM.Provider.Options.Namespace do
     |> Enum.uniq()
   end
 
-  defp schema_key?(key, schema_keys) when is_atom(key), do: key in schema_keys
+  defp schema_key?(key, schema_keys), do: key in schema_keys
 
-  defp schema_key?(key, schema_keys) when is_binary(key),
-    do: Enum.any?(schema_keys, &(Atom.to_string(&1) == key))
-
-  defp schema_key?(_key, _schema_keys), do: false
-
-  defp provider_key?(key, provider) when is_atom(key), do: key == provider
-  defp provider_key?(key, provider) when is_binary(key), do: key == Atom.to_string(provider)
-  defp provider_key?(_key, _provider), do: false
+  defp provider_key?(key, provider), do: key == provider
 
   defp provider_key(key, providers), do: Enum.find(providers, &provider_key?(key, &1))
 
@@ -354,7 +322,7 @@ defmodule ReqLLM.Provider.Options.Namespace do
 
   defp invalid_namespace_structure(provider) do
     invalid_parameter(
-      "provider_options namespace #{inspect(provider)} must contain a keyword list or map"
+      "provider_options namespace #{inspect(provider)} must contain a keyword list"
     )
   end
 

@@ -139,7 +139,7 @@ defmodule ReqLLM.Providers.ElevenLabs do
       http_opts = Keyword.get(opts, :req_http_options, [])
       media_type = Keyword.get(opts, :media_type, "audio/mpeg")
       language = Keyword.get(opts, :language)
-      provider_options = normalize_provider_options(Keyword.get(opts, :provider_options, []))
+      provider_options = Keyword.get(opts, :provider_options, [])
       timeout = Keyword.get(opts, :receive_timeout, 120_000)
 
       ext = ReqLLM.Provider.Defaults.media_type_to_extension(media_type)
@@ -193,10 +193,6 @@ defmodule ReqLLM.Providers.ElevenLabs do
 
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
-
-  defp normalize_provider_options(opts) when is_map(opts), do: Map.to_list(opts)
-  defp normalize_provider_options(opts) when is_list(opts), do: opts
-  defp normalize_provider_options(_opts), do: []
 
   defp transcription_query_params(opts) do
     case List.keyfind(opts, :enable_logging, 0) do

@@ -80,7 +80,7 @@ defmodule ReqLLM.Providers.MetaTest do
           meta_model(),
           "Generate a name",
           compiled_schema: compiled_schema,
-          provider_options: %{store: true}
+          provider_options: [store: true]
         )
 
       body = request |> Meta.encode_body() |> ReqLLM.Test.Helpers.json_body()

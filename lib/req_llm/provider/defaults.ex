@@ -520,19 +520,13 @@ defmodule ReqLLM.Provider.Defaults do
     end
   end
 
-  defp maybe_put_speech_provider_options(body, opts) when is_list(opts) do
+  defp maybe_put_speech_provider_options(body, opts) do
     Enum.reduce(opts, body, fn
       {_key, nil}, acc -> acc
       {:instructions, value}, acc -> Map.put(acc, :instructions, value)
       {key, value}, acc -> Map.put(acc, key, value)
     end)
   end
-
-  defp maybe_put_speech_provider_options(body, opts) when is_map(opts) do
-    maybe_put_speech_provider_options(body, Map.to_list(opts))
-  end
-
-  defp maybe_put_speech_provider_options(body, _), do: body
 
   @doc """
   Filters out internal ReqLLM keys that should not be passed to Req.

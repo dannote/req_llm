@@ -695,36 +695,6 @@ defmodule ReqLLM.Providers.Azure.OptionsTest do
       refute log =~ "Anthropic-specific"
       refute log =~ "thinking config"
     end
-
-    test "handles non-keyword-list provider_options gracefully" do
-      model = %LLMDB.Model{id: "gpt-4o", provider: :azure, capabilities: %{}}
-      # This shouldn't happen in practice, but the code should handle it
-      opts = [provider_options: %{anthropic_prompt_cache: true}]
-
-      # Should not crash
-      {translated, _warnings} = Azure.OpenAI.pre_validate_options(:chat, model, opts)
-      # Options are returned as-is since we can't process a map as keyword list
-      assert translated[:provider_options] == %{anthropic_prompt_cache: true}
-    end
-
-    test "handles string keys in thinking config" do
-      model = %LLMDB.Model{id: "gpt-4o", provider: :azure, capabilities: %{}}
-
-      opts = [
-        provider_options: [
-          additional_model_request_fields: %{"thinking" => %{"type" => "enabled"}}
-        ]
-      ]
-
-      log =
-        capture_log(fn ->
-          {translated, _warnings} = Azure.OpenAI.pre_validate_options(:chat, model, opts)
-          provider_opts = translated[:provider_options] || []
-          refute Keyword.has_key?(provider_opts, :additional_model_request_fields)
-        end)
-
-      assert log =~ "thinking config is Anthropic-specific"
-    end
   end
 
   describe "DeepSeek thinking support" do

@@ -398,16 +398,6 @@ defmodule ReqLLM.Provider.OptionsTest do
 
       assert processed[:provider_options][:max_completion_tokens] == 123
       refute Keyword.has_key?(processed, :max_tokens)
-
-      processed =
-        Options.put_model_max_tokens_default(
-          [provider_options: %{"max_output_tokens" => 456}],
-          model,
-          fallback: 4096
-        )
-
-      assert processed[:provider_options]["max_output_tokens"] == 456
-      refute Keyword.has_key?(processed, :max_tokens)
     end
 
     test "public max token default helper uses metadata before fallback" do

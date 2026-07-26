@@ -419,36 +419,11 @@ defmodule ReqLLM.Providers.Meta do
     Application.get_env(:req_llm, :thinking_timeout, 300_000)
   end
 
-  defp option_value(options, key) when is_list(options) do
-    Keyword.get(options, key) || Keyword.get(Keyword.get(options, :provider_options, []), key)
+  defp option_value(options, key) do
+    options[key] || Keyword.get(options[:provider_options] || [], key)
   end
 
-  defp option_value(options, key) when is_map(options) do
-    Map.get(options, key) || Keyword.get(Map.get(options, :provider_options, []), key)
+  defp provider_option_value(options, key) do
+    Keyword.get(options[:provider_options] || [], key)
   end
-
-  defp option_value(_options, _key), do: nil
-
-  defp provider_option_value(options, key) when is_list(options) do
-    provider_option_from_container(Keyword.get(options, :provider_options, []), key)
-  end
-
-  defp provider_option_value(options, key) when is_map(options) do
-    case Map.fetch(options, :provider_options) do
-      {:ok, provider_opts} -> provider_option_from_container(provider_opts, key)
-      :error -> Map.get(options, key) || Map.get(options, Atom.to_string(key))
-    end
-  end
-
-  defp provider_option_value(_options, _key), do: nil
-
-  defp provider_option_from_container(provider_opts, key) when is_list(provider_opts) do
-    Keyword.get(provider_opts, key)
-  end
-
-  defp provider_option_from_container(provider_opts, key) when is_map(provider_opts) do
-    Map.get(provider_opts, key) || Map.get(provider_opts, Atom.to_string(key))
-  end
-
-  defp provider_option_from_container(_provider_opts, _key), do: nil
 end

@@ -1341,9 +1341,7 @@ defmodule ReqLLM.Providers.Anthropic do
     |> maybe_put_server_tool_opt(:citations, get_server_tool_opt(config, :citations))
   end
 
-  defp get_server_tool_opt(config, key) do
-    Map.get(config, key) || Map.get(config, Atom.to_string(key))
-  end
+  defp get_server_tool_opt(config, key), do: Map.get(config, key)
 
   defp maybe_put_server_tool_opt(tool, _key, nil), do: tool
   defp maybe_put_server_tool_opt(tool, key, value), do: Map.put(tool, key, value)
@@ -1834,22 +1832,10 @@ defmodule ReqLLM.Providers.Anthropic do
   end
 
   defp normalize_provider_opts(opts) when is_map(opts) do
-    provider_opts = Map.get(opts, :provider_options, [])
-
-    cond do
-      Keyword.keyword?(provider_opts) -> provider_opts
-      is_map(provider_opts) -> Map.to_list(provider_opts)
-      true -> provider_opts
-    end
+    Map.get(opts, :provider_options, [])
   end
 
-  defp get_output_format(provider_opts) when is_list(provider_opts) do
-    Keyword.get(provider_opts, :output_format)
-  end
-
-  defp get_output_format(provider_opts) when is_map(provider_opts) do
-    provider_opts[:output_format]
-  end
+  defp get_output_format(provider_opts), do: Keyword.get(provider_opts, :output_format)
 
   defp find_structured_output(response, opts) do
     response

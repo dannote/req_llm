@@ -42,36 +42,15 @@ defmodule ReqLLM.Provider.Options.NamespaceTest do
   end
 
   describe "namespace normalization" do
-    test "preserves unambiguous legacy keyword and map containers" do
+    test "normalizes the selected provider namespace to the legacy flat shape" do
       model = model(:mock_namespace)
 
-      keyword_opts = [provider_options: [custom_option: "legacy"]]
-      map_opts = [provider_options: %{"custom_option" => "legacy"}]
-
-      assert {:ok, ^keyword_opts, []} =
-               Namespace.normalize(MockProvider, :chat, model, keyword_opts)
-
-      assert {:ok, ^map_opts, []} = Namespace.normalize(MockProvider, :chat, model, map_opts)
-    end
-
-    test "normalizes atom and string provider namespaces to the legacy flat shape" do
-      model = model(:mock_namespace)
-
-      assert {:ok, atom_opts, []} =
+      assert {:ok, normalized, []} =
                Namespace.normalize(MockProvider, :chat, model,
-                 provider_options: [mock_namespace: [custom_option: "atom"]]
+                 provider_options: [mock_namespace: [custom_option: "value"]]
                )
 
-      assert atom_opts[:provider_options] == [custom_option: "atom"]
-
-      assert {:ok, string_opts, []} =
-               Namespace.normalize(MockProvider, :chat, model,
-                 provider_options: %{
-                   "mock_namespace" => %{"custom_option" => "string"}
-                 }
-               )
-
-      assert string_opts[:provider_options] == [custom_option: "string"]
+      assert normalized[:provider_options] == [custom_option: "value"]
     end
 
     test "uses the same normalization contract across every V1 request operation" do
@@ -130,7 +109,7 @@ defmodule ReqLLM.Provider.Options.NamespaceTest do
                  provider_options: [mock_namespace: "invalid"]
                )
 
-      assert Exception.message(error) =~ "must contain a keyword list or map"
+      assert Exception.message(error) =~ "must contain a keyword list"
     end
 
     test "rejects unknown and misplaced canonical keys inside a namespace" do
@@ -256,19 +235,6 @@ defmodule ReqLLM.Provider.Options.NamespaceTest do
   end
 
   describe "provider processing and planning" do
-    test "accepts flat provider option maps with known string keys" do
-      assert {:ok, processed} =
-               Options.process(MockProvider, :chat, model(:mock_namespace),
-                 provider_options: %{
-                   "custom_option" => "map",
-                   "another_option" => 7
-                 }
-               )
-
-      assert processed[:provider_options][:custom_option] == "map"
-      assert processed[:provider_options][:another_option] == 7
-    end
-
     test "produces equivalent options for OpenAI, Anthropic, and OpenRouter" do
       cases = [
         {ReqLLM.Providers.OpenAI, model(:openai, "gpt-4.1-mini"), [reasoning_summary: "auto"]},
@@ -349,13 +315,6 @@ defmodule ReqLLM.Provider.Options.NamespaceTest do
       assert diagnostic.transport == :websocket
       assert :openai_stream_transport in diagnostic.options.canonical
       refute :openai in diagnostic.options.canonical
-
-      assert {:ok, flat_map_plan} =
-               ReqLLM.RequestPlan.build("openai:gpt-4o-mini", :chat,
-                 provider_options: %{"reasoning_summary" => "auto"}
-               )
-
-      assert flat_map_plan.options[:provider_options] == [reasoning_summary: "auto"]
     end
 
     test "keeps namespace validation actionable in sanitized planning errors" do

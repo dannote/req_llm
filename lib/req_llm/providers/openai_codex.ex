@@ -443,13 +443,8 @@ defmodule ReqLLM.Providers.OpenAICodex do
     Map.put(opts, :provider_options, provider_opts)
   end
 
-  defp provider_options_store_false(provider_opts) when is_list(provider_opts),
+  defp provider_options_store_false(provider_opts),
     do: Keyword.put(provider_opts, :store, false)
-
-  defp provider_options_store_false(provider_opts) when is_map(provider_opts),
-    do: provider_opts |> Map.to_list() |> Keyword.put(:store, false)
-
-  defp provider_options_store_false(_provider_opts), do: [store: false]
 
   defp tool_resume_body?(%{"input" => input}) when is_list(input) do
     Enum.any?(input, fn

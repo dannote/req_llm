@@ -206,26 +206,7 @@ defmodule ReqLLM.Providers.GitHubCopilot do
   end
 
   defp provider_option(opts, provider_opts, key, default) do
-    value_from_opts = Keyword.get(opts, key)
-    value_from_provider_opts = option_from_container(provider_opts, key)
-    value_from_opts || value_from_provider_opts || default
-  end
-
-  defp option_from_container(opts, key) when is_list(opts) do
-    Keyword.get(opts, key) || list_value(opts, Atom.to_string(key))
-  end
-
-  defp option_from_container(opts, key) when is_map(opts) do
-    Map.get(opts, key) || Map.get(opts, Atom.to_string(key))
-  end
-
-  defp option_from_container(_opts, _key), do: nil
-
-  defp list_value(opts, key) do
-    case Enum.find(opts, fn {option_key, _value} -> option_key == key end) do
-      {_key, value} -> value
-      nil -> nil
-    end
+    Keyword.get(opts, key) || Keyword.get(provider_opts, key) || default
   end
 
   defp valid_token?(token), do: is_binary(token) and String.trim(token) != ""

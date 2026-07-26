@@ -1049,7 +1049,7 @@ defmodule ReqLLM.Providers.OpenAI do
   defp openai_compatible_backend(%LLMDB.Model{extra: extra}, opts) do
     normalize_backend(
       provider_option_value(opts, :openai_compatible_backend) ||
-        map_option_value(extra, :openai_compatible_backend)
+        extra[:openai_compatible_backend]
     )
   end
 
@@ -1064,24 +1064,11 @@ defmodule ReqLLM.Providers.OpenAI do
     )
   end
 
-  defp option_value(opts, key) when is_list(opts), do: Keyword.get(opts, key)
-  defp option_value(opts, key) when is_map(opts), do: map_option_value(opts, key)
+  defp option_value(opts, key), do: Keyword.get(opts, key)
 
   defp provider_option_value(opts, key) do
-    opts
-    |> option_value(:provider_options)
-    |> map_or_keyword_value(key)
+    Keyword.get(opts[:provider_options] || [], key)
   end
-
-  defp map_option_value(opts, key) when is_map(opts) do
-    Map.get(opts, key) || Map.get(opts, Atom.to_string(key))
-  end
-
-  defp map_option_value(_opts, _key), do: nil
-
-  defp map_or_keyword_value(opts, key) when is_list(opts), do: Keyword.get(opts, key)
-  defp map_or_keyword_value(opts, key) when is_map(opts), do: map_option_value(opts, key)
-  defp map_or_keyword_value(_opts, _key), do: nil
 
   defp maybe_add_transcription_provider_parts(parts, opts) when is_list(opts) do
     Enum.reduce(opts, parts, fn

@@ -93,13 +93,7 @@ ReqLLM.generate_text(
 )
 ```
 
-Keyword lists and atom-keyed maps are supported:
-
-```elixir
-provider_options: %{
-  openai: %{reasoning_summary: "auto"}
-}
-```
+Provider options and nested provider namespaces use keyword lists.
 
 The namespace is always the actual ReqLLM provider identity. Use `azure:` for
 Azure-hosted models, `google_vertex:` for Vertex-hosted models, and

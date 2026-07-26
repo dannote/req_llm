@@ -53,8 +53,8 @@ defmodule ReqLLM.Rerank do
                    doc: "Maximum number of tokens to consider per document"
                  ],
                  provider_options: [
-                   type: {:or, [:map, {:list, :any}]},
-                   doc: "Provider-specific options (keyword list or map)",
+                   type: :keyword_list,
+                   doc: "Provider-specific options as a keyword list",
                    default: []
                  ],
                  req_http_options: [

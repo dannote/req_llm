@@ -114,14 +114,8 @@ defmodule ReqLLM.Providers.Azure.OpenAI do
           amrf = provider_opts[:additional_model_request_fields]
 
           case amrf do
-            %{thinking: _} ->
-              warn_and_remove_thinking(opts, provider_opts, amrf)
-
-            %{"thinking" => _} ->
-              warn_and_remove_thinking(opts, provider_opts, amrf)
-
-            _ ->
-              opts
+            %{thinking: _} -> warn_and_remove_thinking(opts, provider_opts, amrf)
+            _ -> opts
           end
 
         _ ->
@@ -137,7 +131,7 @@ defmodule ReqLLM.Providers.Azure.OpenAI do
         "For OpenAI reasoning models, use reasoning_effort instead."
     )
 
-    updated_amrf = Map.drop(amrf, [:thinking, "thinking"])
+    updated_amrf = Map.delete(amrf, :thinking)
 
     updated_provider_opts =
       if map_size(updated_amrf) == 0 do
@@ -237,7 +231,6 @@ defmodule ReqLLM.Providers.Azure.OpenAI do
 
       case amrf do
         %{thinking: config} -> maybe_put(body, :thinking, config)
-        %{"thinking" => config} -> maybe_put(body, :thinking, config)
         _ -> body
       end
     else

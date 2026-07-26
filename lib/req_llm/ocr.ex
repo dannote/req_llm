@@ -48,8 +48,8 @@ defmodule ReqLLM.OCR do
                    doc: "Zero-based page indexes to process"
                  ],
                  provider_options: [
-                   type: {:or, [:map, {:list, :any}]},
-                   doc: "Provider-specific options (keyword list or map)",
+                   type: :keyword_list,
+                   doc: "Provider-specific options as a keyword list",
                    default: []
                  ],
                  req_http_options: [

@@ -763,9 +763,7 @@ defmodule ReqLLM.Providers.GoogleVertex do
 
   defp config_value(config, key) when is_list(config), do: Keyword.get(config, key)
 
-  defp config_value(config, key) when is_map(config) do
-    Map.get(config, key) || Map.get(config, Atom.to_string(key))
-  end
+  defp config_value(config, key) when is_map(config), do: Map.get(config, key)
 
   defp config_value(_config, _key), do: nil
 

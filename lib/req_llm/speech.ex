@@ -56,7 +56,7 @@ defmodule ReqLLM.Speech do
                    doc: "ISO-639-1 language code (e.g., \"en\", \"es\"). Provider support varies."
                  ],
                  provider_options: [
-                   type: {:or, [:map, {:list, :any}]},
+                   type: :keyword_list,
                    doc:
                      "Provider-specific options (e.g., [instructions: \"Speak slowly\"] for gpt-4o-mini-tts)",
                    default: []

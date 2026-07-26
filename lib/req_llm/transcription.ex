@@ -50,8 +50,8 @@ defmodule ReqLLM.Transcription do
                      "Language of the audio in ISO-639-1 format (e.g., \"en\"). Helps improve accuracy and speed."
                  ],
                  provider_options: [
-                   type: {:or, [:map, {:list, :any}]},
-                   doc: "Provider-specific transcription options (keyword list or map)",
+                   type: :keyword_list,
+                   doc: "Provider-specific transcription options as a keyword list",
                    default: []
                  ],
                  req_http_options: [

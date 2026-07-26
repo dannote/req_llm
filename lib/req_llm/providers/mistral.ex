@@ -187,17 +187,9 @@ defmodule ReqLLM.Providers.Mistral do
   end
 
   defp provider_option(request, key) do
-    provider_opts = request.options[:provider_options] || []
-
-    cond do
-      option_present?(request.options, key) ->
-        option_value(request.options, key)
-
-      option_present?(provider_opts, key) ->
-        option_value(provider_opts, key)
-
-      true ->
-        nil
+    case Access.fetch(request.options, key) do
+      {:ok, value} -> value
+      :error -> Keyword.get(request.options[:provider_options] || [], key)
     end
   end
 
@@ -237,22 +229,4 @@ defmodule ReqLLM.Providers.Mistral do
 
   defp normalize_nested_key(key) when is_atom(key), do: Atom.to_string(key)
   defp normalize_nested_key(key), do: key
-
-  defp option_present?(value, key) when is_list(value), do: Keyword.has_key?(value, key)
-
-  defp option_present?(value, key) when is_map(value) do
-    Map.has_key?(value, key) or Map.has_key?(value, Atom.to_string(key))
-  end
-
-  defp option_present?(_value, _key), do: false
-
-  defp option_value(value, key) when is_list(value), do: Keyword.fetch!(value, key)
-
-  defp option_value(value, key) when is_map(value) do
-    cond do
-      Map.has_key?(value, key) -> Map.fetch!(value, key)
-      Map.has_key?(value, Atom.to_string(key)) -> Map.fetch!(value, Atom.to_string(key))
-      true -> nil
-    end
-  end
 end

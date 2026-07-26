@@ -40,11 +40,11 @@ defmodule ReqLLM.Providers.GoogleVertex.ConfigTest do
       assert creds[:service_account_json] == "/tmp/config-service-account.json"
     end
 
-    test "uses map config for streaming access token credentials" do
+    test "uses atom-keyed map config for streaming access token credentials" do
       Application.put_env(:req_llm, :google_vertex, %{
-        "access_token" => "config-token",
-        "project_id" => "map-project",
-        "region" => "europe-west4"
+        access_token: "config-token",
+        project_id: "map-project",
+        region: "europe-west4"
       })
 
       {:ok, model} = ReqLLM.model("google_vertex:zai-org/glm-4.7-maas")

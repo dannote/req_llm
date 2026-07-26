@@ -208,9 +208,9 @@ defmodule ReqLLM.Provider.Options do
 
                                # Provider-specific options container
                                provider_options: [
-                                 type: {:or, [:map, {:list, :any}]},
+                                 type: :keyword_list,
                                  doc:
-                                   "Provider-specific options as a flat keyword/map or provider-keyed namespace"
+                                   "Provider-specific options as a flat keyword list or provider-keyed namespace"
                                ],
 
                                # Internal streaming orchestration options
@@ -364,7 +364,6 @@ defmodule ReqLLM.Provider.Options do
     {user_opts, namespace_warnings} =
       ReqLLM.Provider.Options.Namespace.normalize!(provider_mod, operation, model, user_opts)
 
-    user_opts = normalize_flat_provider_options!(provider_mod, user_opts)
     user_opts = handle_stream_alias(user_opts)
     user_opts = normalize_legacy_options(user_opts)
 
@@ -484,15 +483,6 @@ defmodule ReqLLM.Provider.Options do
       {:error, error} ->
         {:error, error}
     end
-  end
-
-  @doc false
-  @spec normalize_flat_provider_options(module(), keyword()) ::
-          {:ok, keyword()} | {:error, Exception.t()}
-  def normalize_flat_provider_options(provider_mod, opts) do
-    {:ok, normalize_flat_provider_options!(provider_mod, opts)}
-  rescue
-    error -> {:error, error}
   end
 
   defp base_schema_for_operation(:image), do: ReqLLM.Images.schema()
@@ -723,63 +713,6 @@ defmodule ReqLLM.Provider.Options do
     |> normalize_tools()
   end
 
-  defp normalize_flat_provider_options!(provider_mod, opts) do
-    case Keyword.fetch(opts, :provider_options) do
-      {:ok, provider_options} when is_map(provider_options) ->
-        normalized = normalize_provider_option_map!(provider_mod, provider_options)
-        Keyword.put(opts, :provider_options, normalized)
-
-      _other ->
-        opts
-    end
-  end
-
-  defp normalize_provider_option_map!(provider_mod, provider_options) do
-    schema_keys =
-      if function_exported?(provider_mod, :provider_schema, 0) do
-        provider_mod.provider_schema().schema |> Keyword.keys()
-      else
-        []
-      end
-
-    schema_names = Map.new(schema_keys, &{Atom.to_string(&1), &1})
-
-    provider_options
-    |> Enum.map(fn
-      {key, value} when is_atom(key) ->
-        {key, value}
-
-      {key, value} when is_binary(key) ->
-        case Map.fetch(schema_names, key) do
-          {:ok, normalized_key} ->
-            {normalized_key, value}
-
-          :error ->
-            raise ReqLLM.Error.Invalid.Parameter.exception(
-                    parameter: "unknown string provider option #{inspect(key)}"
-                  )
-        end
-
-      {key, _value} ->
-        raise ReqLLM.Error.Invalid.Parameter.exception(
-                parameter: "invalid provider option key #{inspect(key)}"
-              )
-    end)
-    |> reject_normalized_map_collisions!()
-  end
-
-  defp reject_normalized_map_collisions!(provider_options) do
-    keys = Keyword.keys(provider_options)
-
-    if length(keys) == MapSet.size(MapSet.new(keys)) do
-      provider_options
-    else
-      raise ReqLLM.Error.Invalid.Parameter.exception(
-              parameter: "provider_options map contains duplicate atom/string option names"
-            )
-    end
-  end
-
   defp extract_model_options(%LLMDB.Model{} = model, opts) do
     maybe_extract_max_tokens(model, opts)
     |> maybe_extract_model_base_url(model)
@@ -807,10 +740,7 @@ defmodule ReqLLM.Provider.Options do
       provider_options when is_list(provider_options) ->
         Keyword.keyword?(provider_options) and Keyword.has_key?(provider_options, key)
 
-      provider_options when is_map(provider_options) ->
-        Map.has_key?(provider_options, key) or Map.has_key?(provider_options, Atom.to_string(key))
-
-      _ ->
+      _provider_options ->
         false
     end
   end
@@ -1165,9 +1095,7 @@ defmodule ReqLLM.Provider.Options do
 
   defp config_value(config, key) when is_list(config), do: Keyword.get(config, key)
 
-  defp config_value(config, key) when is_map(config) do
-    Map.get(config, key) || Map.get(config, Atom.to_string(key))
-  end
+  defp config_value(config, key) when is_map(config), do: Map.get(config, key)
 
   defp config_value(_config, _key), do: nil
 end
