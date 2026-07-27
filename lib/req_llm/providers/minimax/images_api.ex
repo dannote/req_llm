@@ -265,8 +265,8 @@ defmodule ReqLLM.Providers.Minimax.ImagesAPI do
 
   defp reference_to_wire(ref) when is_map(ref) do
     %{
-      "type" => Map.get(ref, "type", Map.get(ref, :type, "character")),
-      "image_file" => Map.get(ref, "image_file", Map.get(ref, :image_file))
+      "type" => Map.get(ref, :type, "character"),
+      "image_file" => Map.get(ref, :image_file)
     }
   end
 

@@ -86,7 +86,7 @@ defmodule ReqLLM.Providers.OpenAI.ResponsesAPI do
     "mcp_call" => :mcp_call,
     "x_search_call" => :x_search_call
   }
-  @tool_call_item_reserved_keys ["id", "call_id", "type", "status", :id, :call_id, :type, :status]
+  @tool_call_item_reserved_keys ["id", "call_id", "type", "status"]
   @assistant_phases ["commentary", "final_answer"]
   @reasoning_encrypted_content_include ["reasoning.encrypted_content"]
 
@@ -382,7 +382,7 @@ defmodule ReqLLM.Providers.OpenAI.ResponsesAPI do
     chunks
     |> Enum.reduce(track_text_delta_event(state, event_type, data), fn
       %ReqLLM.StreamChunk{type: :tool_call, metadata: metadata}, acc ->
-        index = metadata[:index] || metadata["index"] || 0
+        index = metadata[:index] || 0
         indexes = Map.get(acc, :emitted_tool_call_indexes, MapSet.new())
         %{acc | emitted_tool_call_indexes: MapSet.put(indexes, index)}
 
@@ -397,7 +397,7 @@ defmodule ReqLLM.Providers.OpenAI.ResponsesAPI do
 
   defp track_text_delta_event(state, "response.output_text.delta", data) when is_map(data) do
     index = stream_output_index(data)
-    delta = data["delta"] || data[:delta] || ""
+    delta = data["delta"] || ""
 
     if delta == "" do
       state
@@ -421,15 +421,7 @@ defmodule ReqLLM.Providers.OpenAI.ResponsesAPI do
     maybe_add_tool_call_from_item(state, item)
   end
 
-  defp track_tool_call(state, "response.output_item.added", %{item: item}) when is_map(item) do
-    maybe_add_tool_call_from_item(state, item)
-  end
-
   defp track_tool_call(state, "response.output_item.done", %{"item" => item}) when is_map(item) do
-    maybe_add_tool_call_from_item(state, item)
-  end
-
-  defp track_tool_call(state, "response.output_item.done", %{item: item}) when is_map(item) do
     maybe_add_tool_call_from_item(state, item)
   end
 
@@ -447,7 +439,7 @@ defmodule ReqLLM.Providers.OpenAI.ResponsesAPI do
   defp track_tool_call(state, _event_type, _data), do: state
 
   defp maybe_add_tool_call_from_item(state, item) do
-    item_type = item["type"] || item[:type]
+    item_type = item["type"]
 
     if is_binary(item_type) do
       case tool_usage_key_from_call_type(item_type) do
@@ -484,28 +476,15 @@ defmodule ReqLLM.Providers.OpenAI.ResponsesAPI do
   end
 
   defp extract_tool_call_id(data, call_type) when is_map(data) do
-    call_type = if is_atom(call_type), do: Atom.to_string(call_type), else: call_type
-
-    data["id"] || data[:id] || data["call_id"] || data[:call_id] ||
-      data["item_id"] || data[:item_id] ||
+    data["id"] || data["call_id"] || data["item_id"] ||
       get_in(data, ["item", "id"]) ||
-      get_in(data, [:item, :id]) ||
       extract_tool_call_id_from_payload(data, call_type)
   end
 
   defp extract_tool_call_id_from_payload(data, call_type) do
-    call_data = Map.get(data, call_type) || maybe_get_call_atom_key(data, call_type)
-
-    if is_map(call_data) do
-      call_data["id"] || call_data[:id] || call_data["call_id"] || call_data[:call_id]
-    end
-  end
-
-  defp maybe_get_call_atom_key(data, call_type) do
-    atom_key = Map.get(@tool_call_atom_keys, call_type)
-
-    if atom_key do
-      Map.get(data, atom_key)
+    case Map.get(data, call_type) do
+      call_data when is_map(call_data) -> call_data["id"] || call_data["call_id"]
+      _ -> nil
     end
   end
 
@@ -596,59 +575,13 @@ defmodule ReqLLM.Providers.OpenAI.ResponsesAPI do
   defp merge_tool_usage_count(usage, tool, count)
        when is_map(usage) and is_number(count) and count > 0 do
     tool_usage = Map.get(usage, :tool_usage) || %{}
-    existing = tool_usage_entry(tool_usage, tool) || %{}
-    existing_count = Map.get(existing, :count) || 0
-    final_count = max(existing_count, count)
-    key = tool_usage_key_for_merge(tool_usage, tool)
-    updated_tool_usage = Map.put(tool_usage, key, %{count: final_count, unit: :call})
+    existing = Map.get(tool_usage, tool) || %{}
+    final_count = max(Map.get(existing, :count, 0), count)
+    updated_tool_usage = Map.put(tool_usage, tool, %{count: final_count, unit: :call})
     Map.put(usage, :tool_usage, updated_tool_usage)
   end
 
   defp merge_tool_usage_count(usage, _tool, _count), do: usage
-
-  defp tool_usage_entry(tool_usage, tool) when is_map(tool_usage) do
-    cond do
-      Map.has_key?(tool_usage, tool) ->
-        Map.get(tool_usage, tool)
-
-      is_atom(tool) and Map.has_key?(tool_usage, Atom.to_string(tool)) ->
-        Map.get(tool_usage, Atom.to_string(tool))
-
-      is_binary(tool) ->
-        atom_key = Map.get(@tool_usage_type_atoms, tool)
-
-        if atom_key && Map.has_key?(tool_usage, atom_key) do
-          Map.get(tool_usage, atom_key)
-        end
-
-      true ->
-        nil
-    end
-  end
-
-  defp tool_usage_entry(_tool_usage, _tool), do: nil
-
-  defp tool_usage_key_for_merge(tool_usage, tool) when is_map(tool_usage) do
-    cond do
-      Map.has_key?(tool_usage, tool) ->
-        tool
-
-      is_atom(tool) and Map.has_key?(tool_usage, Atom.to_string(tool)) ->
-        Atom.to_string(tool)
-
-      is_binary(tool) ->
-        atom_key = Map.get(@tool_usage_type_atoms, tool)
-
-        if atom_key && Map.has_key?(tool_usage, atom_key) do
-          atom_key
-        else
-          tool
-        end
-
-      true ->
-        tool
-    end
-  end
 
   # ========================================================================
   # Shared Request Building Helpers (used by both encode_body and attach_stream)
@@ -1172,7 +1105,7 @@ defmodule ReqLLM.Providers.OpenAI.ResponsesAPI do
     if argument_fragment_emitted?(state, index) do
       []
     else
-      arguments = data["arguments"] || data[:arguments] || data["delta"] || data[:delta]
+      arguments = data["arguments"] || data["delta"]
 
       if is_binary(arguments) and arguments != "" do
         [
@@ -1209,19 +1142,15 @@ defmodule ReqLLM.Providers.OpenAI.ResponsesAPI do
     handle_output_item_added_item(item, data)
   end
 
-  defp handle_output_item_added(%{item: item} = data) when is_map(item) do
-    handle_output_item_added_item(item, data)
-  end
-
   defp handle_output_item_added(_), do: []
 
   defp handle_output_item_added_item(item, data) do
-    case item["type"] || item[:type] do
+    case item["type"] do
       "function_call" ->
         index = stream_output_index(data)
-        call_id = item["call_id"] || item[:call_id] || item["id"] || item[:id]
+        call_id = item["call_id"] || item["id"]
         call_id = call_id || "call_#{:erlang.unique_integer([:positive])}"
-        name = item["name"] || item[:name]
+        name = item["name"]
 
         if name && name != "" do
           [
@@ -1244,7 +1173,7 @@ defmodule ReqLLM.Providers.OpenAI.ResponsesAPI do
             [
               ReqLLM.StreamChunk.meta(%{
                 builtin_tool_started: %{
-                  id: item["id"] || item[:id] || item["call_id"] || item[:call_id],
+                  id: item["id"] || item["call_id"],
                   name: type,
                   index: stream_output_index(data),
                   started_at_unix_nano: System.system_time(:nanosecond)
@@ -1267,14 +1196,10 @@ defmodule ReqLLM.Providers.OpenAI.ResponsesAPI do
     handle_output_item_done_item(item, data, state)
   end
 
-  defp handle_output_item_done(%{item: item} = data, state) when is_map(item) do
-    handle_output_item_done_item(item, data, state)
-  end
-
   defp handle_output_item_done(_, _), do: []
 
   defp handle_output_item_done_item(item, data, state) do
-    type = item["type"] || item[:type]
+    type = item["type"]
 
     cond do
       type == "function_call" ->
@@ -1309,7 +1234,7 @@ defmodule ReqLLM.Providers.OpenAI.ResponsesAPI do
         })
       ]
     else
-      id = item["id"] || item[:id] || item["call_id"] || item[:call_id]
+      id = item["id"] || item["call_id"]
 
       args_map =
         item
@@ -1332,9 +1257,9 @@ defmodule ReqLLM.Providers.OpenAI.ResponsesAPI do
 
   defp handle_function_call_item_done(item, data, state) do
     index = stream_output_index(data)
-    name = item["name"] || item[:name]
-    call_id = item["call_id"] || item[:call_id] || item["id"] || item[:id]
-    arguments = item["arguments"] || item[:arguments]
+    name = item["name"]
+    call_id = item["call_id"] || item["id"]
+    arguments = item["arguments"]
 
     chunks =
       if is_binary(name) and name != "" and not tool_call_emitted?(state, index) do
@@ -1378,12 +1303,6 @@ defmodule ReqLLM.Providers.OpenAI.ResponsesAPI do
     |> Enum.map_join("", &extract_text_field/1)
   end
 
-  defp message_item_text(%{content: content}) when is_list(content) do
-    content
-    |> Enum.filter(&((Map.get(&1, :type) || Map.get(&1, "type")) in ["output_text", "text"]))
-    |> Enum.map_join("", &extract_text_field/1)
-  end
-
   defp message_item_text(_), do: ""
 
   defp tool_call_emitted?(nil, _index), do: false
@@ -1411,7 +1330,7 @@ defmodule ReqLLM.Providers.OpenAI.ResponsesAPI do
   end
 
   defp stream_output_index(data) when is_map(data) do
-    data["output_index"] || data[:output_index] || data["index"] || data[:index] || 0
+    data["output_index"] || data["index"] || 0
   end
 
   defp maybe_put_string(map, _key, nil), do: map
@@ -2202,7 +2121,6 @@ defmodule ReqLLM.Providers.OpenAI.ResponsesAPI do
   defp extract_code_interpreter_items(_), do: []
 
   defp code_interpreter_item?(%{"type" => "code_interpreter" <> _}), do: true
-  defp code_interpreter_item?(%{type: "code_interpreter" <> _}), do: true
   defp code_interpreter_item?(_), do: false
 
   defp put_code_interpreter_meta(provider_meta, []), do: provider_meta
@@ -2312,26 +2230,17 @@ defmodule ReqLLM.Providers.OpenAI.ResponsesAPI do
   end
 
   defp extract_tool_counts_from_map(map, suffix) when is_map(map) and is_binary(suffix) do
-    Enum.reduce(map, %{}, fn {key, value}, acc ->
-      key_string =
-        cond do
-          is_binary(key) -> key
-          is_atom(key) -> Atom.to_string(key)
-          true -> to_string(key)
+    Enum.reduce(map, %{}, fn
+      {key, value}, acc when is_binary(key) and is_number(value) and value > 0 ->
+        if String.ends_with?(key, suffix) do
+          base = String.replace_suffix(key, suffix, "")
+          update_tool_count(acc, tool_usage_key(base), value)
+        else
+          acc
         end
 
-      cond do
-        not String.ends_with?(key_string, suffix) ->
-          acc
-
-        not (is_number(value) and value > 0) ->
-          acc
-
-        true ->
-          base = String.replace_suffix(key_string, suffix, "")
-          tool = tool_usage_key(base)
-          update_tool_count(acc, tool, value)
-      end
+      _, acc ->
+        acc
     end)
   end
 

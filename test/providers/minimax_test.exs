@@ -495,28 +495,6 @@ defmodule ReqLLM.Providers.MinimaxTest do
              ]
     end
 
-    test "prepare_request and encode_body accept a string-keyed subject_reference map" do
-      model = minimax_image_model()
-
-      {:ok, request} =
-        Minimax.prepare_request(:image, model, "A girl by a window",
-          api_key: "test-key",
-          provider_options: [
-            subject_reference: %{
-              "type" => "character",
-              "image_file" => "https://example.com/face.jpg"
-            }
-          ]
-        )
-
-      encoded = Minimax.encode_body(request)
-      body = ReqLLM.Test.Helpers.json_body(encoded)
-
-      assert body["subject_reference"] == [
-               %{"type" => "character", "image_file" => "https://example.com/face.jpg"}
-             ]
-    end
-
     test "generate_image completes a MiniMax public API round trip" do
       image_data = <<0xFF, 0xD8, 0xFF, 0xE0, "generated-image">>
 
@@ -553,8 +531,8 @@ defmodule ReqLLM.Providers.MinimaxTest do
                  size: "1792x1024",
                  provider_options: [
                    subject_reference: %{
-                     "type" => "character",
-                     "image_file" => "https://example.com/face.jpg"
+                     type: "character",
+                     image_file: "https://example.com/face.jpg"
                    }
                  ],
                  req_http_options: [plug: {Req.Test, __MODULE__}]

@@ -19,7 +19,7 @@ defmodule ReqLLM.Providers.OpenAICodex.ResponsesLiteTest do
              |> ResponsesLite.enabled?()
 
       assert "custom-codex-model"
-             |> model(%{"openai_codex" => %{"use_responses_lite" => true}})
+             |> model(%{openai_codex: %{use_responses_lite: true}})
              |> ResponsesLite.enabled?()
     end
   end
@@ -94,8 +94,8 @@ defmodule ReqLLM.Providers.OpenAICodex.ResponsesLiteTest do
         "tools" => [
           %{"type" => "web_search"},
           %{"type" => "image_generation"},
-          %{"type" => :file_search},
-          %{type: :code_interpreter},
+          %{"type" => "file_search"},
+          %{"type" => "code_interpreter"},
           %{"type" => "function", "name" => "lookup"}
         ]
       }

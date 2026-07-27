@@ -694,18 +694,10 @@ defmodule ReqLLM.Providers.OpenRouter do
     end
   end
 
-  @passthrough_content_metadata_keys [:cache_control, "cache_control"]
+  @passthrough_content_metadata_keys [:cache_control]
 
   defp merge_content_metadata(base, metadata) when is_map(metadata) and map_size(metadata) > 0 do
-    passthrough =
-      metadata
-      |> Map.take(@passthrough_content_metadata_keys)
-      |> Map.new(fn
-        {"cache_control", value} -> {:cache_control, value}
-        {key, value} -> {key, value}
-      end)
-
-    Map.merge(base, passthrough)
+    Map.merge(base, Map.take(metadata, @passthrough_content_metadata_keys))
   end
 
   defp merge_content_metadata(base, _metadata), do: base

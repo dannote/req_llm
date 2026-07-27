@@ -52,7 +52,7 @@ defmodule ReqLLM.Providers.Minimax do
     subject_reference: [
       type: :any,
       doc:
-        ~s|Image-to-image character reference for MiniMax image generation. A keyword list or map (or list thereof) with :type/"type" ("character") and :image_file/"image_file" (public URL or base64 data URL).|
+        ~s|Image-to-image character reference for MiniMax image generation. A keyword list or atom-keyed map (or list thereof) with :type ("character") and :image_file (public URL or base64 data URL).|
     ]
   ]
 
@@ -383,20 +383,12 @@ defmodule ReqLLM.Providers.Minimax do
     end
   end
 
-  defp encode_minimax_reasoning_history(body, %ReqLLM.Context{messages: context_messages}) do
-    cond do
-      is_list(Map.get(body, :messages)) ->
-        %{body | messages: encode_minimax_messages_reasoning(body.messages, context_messages)}
-
-      is_list(Map.get(body, "messages")) ->
-        %{
-          body
-          | "messages" => encode_minimax_messages_reasoning(body["messages"], context_messages)
-        }
-
-      true ->
-        body
-    end
+  defp encode_minimax_reasoning_history(
+         %{messages: messages} = body,
+         %ReqLLM.Context{messages: context_messages}
+       )
+       when is_list(messages) do
+    %{body | messages: encode_minimax_messages_reasoning(messages, context_messages)}
   end
 
   defp encode_minimax_reasoning_history(body, _context), do: body
@@ -423,17 +415,11 @@ defmodule ReqLLM.Providers.Minimax do
   defp encode_minimax_message_reasoning(encoded_message, _context_message), do: encoded_message
 
   defp put_minimax_reasoning_details(message, []) when is_map(message) do
-    message
-    |> Map.delete(:reasoning_details)
-    |> Map.delete("reasoning_details")
+    Map.delete(message, :reasoning_details)
   end
 
   defp put_minimax_reasoning_details(%{} = message, details) do
-    cond do
-      Map.has_key?(message, :role) -> Map.put(message, :reasoning_details, details)
-      Map.has_key?(message, "role") -> Map.put(message, "reasoning_details", details)
-      true -> Map.put(message, :reasoning_details, details)
-    end
+    Map.put(message, :reasoning_details, details)
   end
 
   defp encode_minimax_reasoning_details(details) do
@@ -441,18 +427,6 @@ defmodule ReqLLM.Providers.Minimax do
   end
 
   defp encode_minimax_reasoning_detail(%ReqLLM.Message.ReasoningDetails{} = detail) do
-    detail
-    |> minimax_reasoning_detail_attrs()
-    |> minimax_reasoning_detail_to_wire()
-  end
-
-  defp encode_minimax_reasoning_detail(%{provider: :minimax} = detail) do
-    detail
-    |> minimax_reasoning_detail_attrs()
-    |> minimax_reasoning_detail_to_wire()
-  end
-
-  defp encode_minimax_reasoning_detail(%{"provider" => "minimax"} = detail) do
     detail
     |> minimax_reasoning_detail_attrs()
     |> minimax_reasoning_detail_to_wire()
@@ -470,35 +444,14 @@ defmodule ReqLLM.Providers.Minimax do
     }
   end
 
-  defp minimax_reasoning_detail_attrs(detail) do
-    %{
-      provider_data: map_get(detail, :provider_data, "provider_data", %{}),
-      signature: map_get(detail, :signature, "signature", nil),
-      format: map_get(detail, :format, "format", "minimax-response-v1"),
-      index: map_get(detail, :index, "index", 0),
-      text: map_get(detail, :text, "text", nil)
-    }
-  end
-
   defp minimax_reasoning_detail_to_wire(attrs) do
-    attrs.provider_data
-    |> normalize_provider_data()
+    (attrs.provider_data || %{})
     |> Map.put_new("type", "reasoning.text")
     |> maybe_put_wire_field("id", attrs.signature)
     |> Map.put("format", attrs.format)
     |> Map.put("index", attrs.index)
     |> maybe_put_wire_field("text", attrs.text)
     |> drop_nil_values()
-  end
-
-  defp normalize_provider_data(data) when is_map(data) do
-    Map.new(data, fn {key, value} -> {to_string(key), value} end)
-  end
-
-  defp normalize_provider_data(_), do: %{}
-
-  defp map_get(map, atom_key, string_key, default) do
-    Map.get(map, atom_key, Map.get(map, string_key, default))
   end
 
   defp maybe_put_wire_field(map, _key, nil), do: map

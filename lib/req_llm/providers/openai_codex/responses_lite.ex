@@ -80,10 +80,7 @@ defmodule ReqLLM.Providers.OpenAICodex.ResponsesLite do
     Enum.reject(tools, fn tool -> tool_type(tool) in @hosted_tool_types end)
   end
 
-  defp tool_type(%{"type" => type}) when is_atom(type), do: Atom.to_string(type)
   defp tool_type(%{"type" => type}), do: type
-  defp tool_type(%{type: type}) when is_atom(type), do: Atom.to_string(type)
-  defp tool_type(%{type: type}), do: type
   defp tool_type(_tool), do: nil
 
   defp prepare_images(items) when is_list(items), do: Enum.map(items, &prepare_images/1)
@@ -110,12 +107,7 @@ defmodule ReqLLM.Providers.OpenAICodex.ResponsesLite do
   defp prepare_images(value), do: value
 
   defp model_metadata_value(%LLMDB.Model{extra: extra}, key) when is_map(extra) do
-    metadata = Map.get(extra, :openai_codex) || Map.get(extra, "openai_codex") || %{}
-
-    case Map.fetch(metadata, key) do
-      {:ok, value} -> value
-      :error -> Map.get(metadata, Atom.to_string(key))
-    end
+    Map.get(Map.get(extra, :openai_codex) || %{}, key)
   end
 
   defp model_metadata_value(_model, _key), do: nil
