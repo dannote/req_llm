@@ -17,17 +17,6 @@ defmodule ReqLLM.ProviderFileReference do
   @metadata_key "provider_file"
   @redacted "[REDACTED]"
   @allowed_options [:purpose, :status, :expires_at, :size, :sha256, :provider_metadata]
-  @known_key_atoms %{
-    "schema_version" => :schema_version,
-    "provider" => :provider,
-    "reference_id" => :reference_id,
-    "purpose" => :purpose,
-    "status" => :status,
-    "expires_at" => :expires_at,
-    "size" => :size,
-    "sha256" => :sha256,
-    "metadata" => :metadata
-  }
   @sensitive_keys ~w(
     access_token api_key api_token authorization credential credentials data file_id password
     reference_id secret token url
@@ -87,12 +76,8 @@ defmodule ReqLLM.ProviderFileReference do
   @spec fetch(ContentPart.t() | map()) :: {:ok, t()} | :error
   def fetch(%ContentPart{type: :file, metadata: metadata}), do: fetch_metadata(metadata)
 
-  def fetch(%{type: type} = part) when type in [:file, "file"] do
-    fetch_metadata(Map.get(part, :metadata) || Map.get(part, "metadata") || %{})
-  end
-
-  def fetch(%{"type" => "file"} = part) do
-    fetch_metadata(Map.get(part, "metadata") || Map.get(part, :metadata) || %{})
+  def fetch(%{type: :file} = part) do
+    fetch_metadata(Map.get(part, :metadata, %{}))
   end
 
   def fetch(_part), do: :error
@@ -184,33 +169,18 @@ defmodule ReqLLM.ProviderFileReference do
   end
 
   defp fetch_metadata(metadata) when is_map(metadata) do
-    with namespace when is_map(namespace) <-
-           Map.get(metadata, @namespace) || Map.get(metadata, :req_llm),
-         reference when is_map(reference) <-
-           Map.get(namespace, @metadata_key) || Map.get(namespace, :provider_file),
-         provider when is_binary(provider) and provider != "" <- get_value(reference, "provider"),
+    with namespace when is_map(namespace) <- Map.get(metadata, @namespace),
+         reference when is_map(reference) <- Map.get(namespace, @metadata_key),
+         provider when is_binary(provider) and provider != "" <- Map.get(reference, "provider"),
          reference_id when is_binary(reference_id) and reference_id != "" <-
-           get_value(reference, "reference_id") do
-      {:ok,
-       reference
-       |> stringify_known_keys()
-       |> Map.put("provider", provider)
-       |> Map.put("reference_id", reference_id)}
+           Map.get(reference, "reference_id") do
+      {:ok, reference}
     else
       _other -> :error
     end
   end
 
   defp fetch_metadata(_metadata), do: :error
-
-  defp stringify_known_keys(reference) do
-    Enum.reduce(@known_key_atoms, reference, fn {key, atom_key}, acc ->
-      case Map.fetch(acc, atom_key) do
-        {:ok, value} -> acc |> Map.delete(atom_key) |> Map.put(key, value)
-        :error -> acc
-      end
-    end)
-  end
 
   defp validate_reference(reference, provider, now, validate_expiry?) do
     owner = get_value(reference, "provider")
@@ -281,9 +251,8 @@ defmodule ReqLLM.ProviderFileReference do
 
   defp sanitize_value(value), do: value
 
-  defp sensitive_key?(key) when is_atom(key) or is_binary(key) do
+  defp sensitive_key?(key) when is_binary(key) do
     key
-    |> to_string()
     |> String.downcase()
     |> then(fn name ->
       name in @sensitive_keys or String.contains?(name, "credential") or
@@ -360,8 +329,9 @@ defmodule ReqLLM.ProviderFileReference do
   defp normalize_metadata!(_value), do: raise(ArgumentError, "provider_metadata must be a map")
 
   defp normalize_metadata_value!(value) when is_map(value) do
-    Map.new(value, fn {key, entry} ->
-      {normalize_metadata_key!(key), normalize_metadata_value!(entry)}
+    Map.new(value, fn
+      {key, entry} when is_binary(key) -> {key, normalize_metadata_value!(entry)}
+      {_key, _entry} -> raise ArgumentError, "provider_metadata keys must be strings"
     end)
   end
 
@@ -373,25 +343,14 @@ defmodule ReqLLM.ProviderFileReference do
        when is_binary(value) or is_number(value) or is_boolean(value) or is_nil(value),
        do: value
 
-  defp normalize_metadata_value!(value) when is_atom(value), do: Atom.to_string(value)
-
   defp normalize_metadata_value!(_value) do
     raise ArgumentError, "provider_metadata values must be JSON-safe"
-  end
-
-  defp normalize_metadata_key!(key) when is_binary(key), do: key
-  defp normalize_metadata_key!(key) when is_atom(key), do: Atom.to_string(key)
-
-  defp normalize_metadata_key!(_key) do
-    raise ArgumentError, "provider_metadata keys must be atoms or strings"
   end
 
   defp put_optional(map, _key, nil), do: map
   defp put_optional(map, key, value), do: Map.put(map, key, value)
 
-  defp get_value(map, key) do
-    Map.get(map, key) || Map.get(map, Map.fetch!(@known_key_atoms, key))
-  end
+  defp get_value(map, key), do: Map.get(map, key)
 
   defp binary_size_or_nil(nil), do: nil
   defp binary_size_or_nil(data) when is_binary(data), do: byte_size(data)

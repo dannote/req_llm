@@ -66,7 +66,7 @@ defmodule ReqLLM.Telemetry.RequestOptions do
     do: conversation_id_from(Map.new(list))
 
   defp conversation_id_from(map) when is_map(map) do
-    Map.get(map, :conversation_id, Map.get(map, "conversation_id"))
+    Map.get(map, :conversation_id)
   end
 
   defp conversation_id_from(_), do: nil

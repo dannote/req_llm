@@ -70,8 +70,8 @@ defmodule ReqLLM.ProviderFileReferenceTest do
     owned =
       ContentPart.owned_file_id("file-secret", :openai,
         provider_metadata: %{
-          url: "https://example.com/private",
-          credential: "credential-secret"
+          "url" => "https://example.com/private",
+          "credential" => "credential-secret"
         }
       )
 

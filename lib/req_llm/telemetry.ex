@@ -668,8 +668,8 @@ defmodule ReqLLM.Telemetry do
 
   defp parse_telemetry_opt(opts) when is_map(opts) do
     %{
-      payloads: parse_payload_mode(Map.get(opts, :payloads, Map.get(opts, "payloads"))),
-      conversation_id: Map.get(opts, :conversation_id, Map.get(opts, "conversation_id"))
+      payloads: parse_payload_mode(Map.get(opts, :payloads)),
+      conversation_id: Map.get(opts, :conversation_id)
     }
   end
 
@@ -1056,12 +1056,12 @@ defmodule ReqLLM.Telemetry do
 
   defp sanitize_content_part(%{type: :file} = part) when is_map(part) do
     %{
-      type: Map.get(part, :type) || Map.get(part, "type"),
-      file_id: Map.get(part, :file_id) || Map.get(part, "file_id"),
-      filename: Map.get(part, :filename) || Map.get(part, "filename"),
-      media_type: Map.get(part, :media_type) || Map.get(part, "media_type"),
-      bytes: binary_size_or_nil(Map.get(part, :data) || Map.get(part, "data")),
-      metadata: Map.get(part, :metadata) || Map.get(part, "metadata", %{})
+      type: Map.get(part, :type),
+      file_id: Map.get(part, :file_id),
+      filename: Map.get(part, :filename),
+      media_type: Map.get(part, :media_type),
+      bytes: binary_size_or_nil(Map.get(part, :data)),
+      metadata: Map.get(part, :metadata, %{})
     }
   end
 
@@ -1150,17 +1150,17 @@ defmodule ReqLLM.Telemetry do
   end
 
   defp summarize_response(:ocr, body) when is_map(body) do
-    pages = List.wrap(fetch_value(body, :pages))
+    pages = List.wrap(fetch_value(body, "pages"))
 
     %{
       page_count: length(pages),
       text_bytes:
         Enum.reduce(pages, 0, fn page, total ->
-          total + byte_size(to_string(fetch_value(page, :markdown) || ""))
+          total + byte_size(to_string(fetch_value(page, "markdown") || ""))
         end),
       image_count:
         Enum.reduce(pages, 0, fn page, total ->
-          total + length(List.wrap(fetch_value(page, :images)))
+          total + length(List.wrap(fetch_value(page, "images")))
         end)
     }
   end
@@ -1169,24 +1169,19 @@ defmodule ReqLLM.Telemetry do
 
   defp summarize_transcription_map(body) do
     %{
-      text_bytes: byte_size(to_string(fetch_value(body, :text) || "")),
-      segment_count: length(fetch_value(body, :segments) || []),
+      text_bytes: byte_size(to_string(fetch_value(body, "text") || "")),
+      segment_count: length(fetch_value(body, "segments") || []),
       duration_in_seconds:
-        fetch_value(body, :duration_in_seconds) || fetch_value(body, :duration) ||
-          fetch_value(body, :audio_duration)
+        fetch_value(body, "duration_in_seconds") || fetch_value(body, "duration") ||
+          fetch_value(body, "audio_duration")
     }
   end
 
   defp embedding_vector_count(%{"data" => data}) when is_list(data), do: length(data)
-  defp embedding_vector_count(%{data: data}) when is_list(data), do: length(data)
   defp embedding_vector_count(_), do: nil
 
   defp embedding_dimensions(%{"data" => [%{"embedding" => embedding} | _]})
        when is_list(embedding) do
-    length(embedding)
-  end
-
-  defp embedding_dimensions(%{data: [%{embedding: embedding} | _]}) when is_list(embedding) do
     length(embedding)
   end
 
@@ -1504,8 +1499,8 @@ defmodule ReqLLM.Telemetry do
   defp normalize_effort_effective(body) when is_map(body) do
     effort =
       normalize_reasoning_effort(
-        fetch_value(body, :reasoning, :effort) ||
-          fetch_value(body, :reasoning_effort)
+        fetch_value(body, "reasoning", "effort") ||
+          fetch_value(body, "reasoning_effort")
       )
 
     disable? = effort == :none
@@ -1527,15 +1522,15 @@ defmodule ReqLLM.Telemetry do
   end
 
   defp normalize_thinking_effective(body) when is_map(body) do
-    thinking = fetch_value(body, :thinking)
-    budget_tokens = fetch_value(thinking, :budget_tokens)
+    thinking = fetch_value(body, "thinking")
+    budget_tokens = fetch_value(thinking, "budget_tokens")
 
     disable? =
-      fetch_value(thinking, :type) == "disabled" or
+      fetch_value(thinking, "type") == "disabled" or
         budget_tokens == 0
 
     enable? =
-      fetch_value(thinking, :type) == "enabled" or
+      fetch_value(thinking, "type") == "enabled" or
         enabled_budget?(budget_tokens)
 
     reasoning_shape(
@@ -1555,17 +1550,17 @@ defmodule ReqLLM.Telemetry do
       shape
     else
       thinking =
-        fetch_value(body, :additionalModelRequestFields, :thinking) ||
-          fetch_value(body, :additional_model_request_fields, :thinking)
+        fetch_value(body, "additionalModelRequestFields", "thinking") ||
+          fetch_value(body, "additional_model_request_fields", "thinking")
 
-      budget_tokens = fetch_value(thinking, :budget_tokens)
+      budget_tokens = fetch_value(thinking, "budget_tokens")
 
       disable? =
-        fetch_value(thinking, :type) == "disabled" or
+        fetch_value(thinking, "type") == "disabled" or
           budget_tokens == 0
 
       enable? =
-        fetch_value(thinking, :type) == "enabled" or
+        fetch_value(thinking, "type") == "enabled" or
           enabled_budget?(budget_tokens)
 
       merge_reasoning_shapes(
@@ -1582,12 +1577,12 @@ defmodule ReqLLM.Telemetry do
 
   defp normalize_google_effective(body) when is_map(body) do
     thinking_level =
-      fetch_value(body, :generationConfig, :thinkingConfig, :thinkingLevel) ||
-        fetch_value(body, :thinkingConfig, :thinkingLevel)
+      fetch_value(body, "generationConfig", "thinkingConfig", "thinkingLevel") ||
+        fetch_value(body, "thinkingConfig", "thinkingLevel")
 
     budget_tokens =
-      fetch_value(body, :generationConfig, :thinkingConfig, :thinkingBudget) ||
-        fetch_value(body, :thinkingConfig, :thinkingBudget)
+      fetch_value(body, "generationConfig", "thinkingConfig", "thinkingBudget") ||
+        fetch_value(body, "thinkingConfig", "thinkingBudget")
 
     if thinking_level do
       effort = thinking_level_to_effort(thinking_level)
@@ -1618,8 +1613,8 @@ defmodule ReqLLM.Telemetry do
   defp thinking_level_to_effort(_), do: nil
 
   defp normalize_alibaba_effective(body) when is_map(body) do
-    enabled? = fetch_value(body, :enable_thinking)
-    budget_tokens = fetch_value(body, :thinking_budget)
+    enabled? = fetch_value(body, "enable_thinking")
+    budget_tokens = fetch_value(body, "thinking_budget")
     disable? = enabled? == false or budget_tokens == 0
     enable? = enabled? == true or enabled_budget?(budget_tokens)
 
@@ -1634,10 +1629,10 @@ defmodule ReqLLM.Telemetry do
   defp normalize_alibaba_effective(_body), do: disabled_reasoning_shape()
 
   defp normalize_thinking_toggle_effective(body) when is_map(body) do
-    thinking = fetch_value(body, :thinking)
+    thinking = fetch_value(body, "thinking")
 
-    disable? = fetch_value(thinking, :type) == "disabled"
-    enable? = fetch_value(thinking, :type) == "enabled"
+    disable? = fetch_value(thinking, "type") == "disabled"
+    enable? = fetch_value(thinking, "type") == "enabled"
 
     reasoning_shape(mode_from_signals(enable?, disable?), nil, nil, enable? or disable?)
   end
@@ -1645,22 +1640,22 @@ defmodule ReqLLM.Telemetry do
   defp normalize_thinking_toggle_effective(_body), do: disabled_reasoning_shape()
 
   defp normalize_zenmux_effective(body) when is_map(body) do
-    reasoning = fetch_value(body, :reasoning)
+    reasoning = fetch_value(body, "reasoning")
 
     direct_effort =
-      fetch_value(body, :reasoning_effort)
+      fetch_value(body, "reasoning_effort")
       |> normalize_reasoning_effort()
 
     depth_effort =
-      fetch_value(reasoning, :depth)
+      fetch_value(reasoning, "depth")
       |> normalize_reasoning_effort()
 
     disable? =
-      fetch_value(reasoning, :enable) == false or
+      fetch_value(reasoning, "enable") == false or
         direct_effort == :none
 
     enable? =
-      fetch_value(reasoning, :enable) == true or
+      fetch_value(reasoning, "enable") == true or
         depth_effort in @canonical_reasoning_efforts or
         direct_effort in @canonical_reasoning_efforts
 
@@ -1820,39 +1815,41 @@ defmodule ReqLLM.Telemetry do
   defp request_contract_from_model_family(_provider, _family), do: nil
 
   defp openai_reasoning_body?(body) do
-    not is_nil(fetch_value(body, :reasoning, :effort)) or
-      not is_nil(fetch_value(body, :reasoning_effort))
+    not is_nil(fetch_value(body, "reasoning", "effort")) or
+      not is_nil(fetch_value(body, "reasoning_effort"))
   end
 
   defp anthropic_thinking_body?(body) do
-    not is_nil(fetch_value(body, :thinking, :type)) or
-      not is_nil(fetch_value(body, :thinking, :budget_tokens)) or
-      not is_nil(fetch_value(body, :additionalModelRequestFields, :thinking, :type)) or
-      not is_nil(fetch_value(body, :additionalModelRequestFields, :thinking, :budget_tokens)) or
-      not is_nil(fetch_value(body, :additional_model_request_fields, :thinking, :type)) or
-      not is_nil(fetch_value(body, :additional_model_request_fields, :thinking, :budget_tokens))
+    not is_nil(fetch_value(body, "thinking", "type")) or
+      not is_nil(fetch_value(body, "thinking", "budget_tokens")) or
+      not is_nil(fetch_value(body, "additionalModelRequestFields", "thinking", "type")) or
+      not is_nil(fetch_value(body, "additionalModelRequestFields", "thinking", "budget_tokens")) or
+      not is_nil(fetch_value(body, "additional_model_request_fields", "thinking", "type")) or
+      not is_nil(
+        fetch_value(body, "additional_model_request_fields", "thinking", "budget_tokens")
+      )
   end
 
   defp google_reasoning_body?(body) do
-    not is_nil(fetch_value(body, :generationConfig, :thinkingConfig, :thinkingBudget)) or
-      not is_nil(fetch_value(body, :thinkingConfig, :thinkingBudget)) or
-      not is_nil(fetch_value(body, :generationConfig, :thinkingConfig, :thinkingLevel)) or
-      not is_nil(fetch_value(body, :thinkingConfig, :thinkingLevel))
+    not is_nil(fetch_value(body, "generationConfig", "thinkingConfig", "thinkingBudget")) or
+      not is_nil(fetch_value(body, "thinkingConfig", "thinkingBudget")) or
+      not is_nil(fetch_value(body, "generationConfig", "thinkingConfig", "thinkingLevel")) or
+      not is_nil(fetch_value(body, "thinkingConfig", "thinkingLevel"))
   end
 
   defp alibaba_reasoning_body?(body) do
-    not is_nil(fetch_value(body, :enable_thinking)) or
-      not is_nil(fetch_value(body, :thinking_budget))
+    not is_nil(fetch_value(body, "enable_thinking")) or
+      not is_nil(fetch_value(body, "thinking_budget"))
   end
 
   defp thinking_toggle_body?(body) do
-    not is_nil(fetch_value(body, :thinking, :type))
+    not is_nil(fetch_value(body, "thinking", "type"))
   end
 
   defp zenmux_reasoning_body?(body) do
-    not is_nil(fetch_value(body, :reasoning, :enable)) or
-      not is_nil(fetch_value(body, :reasoning, :depth)) or
-      not is_nil(fetch_value(body, :reasoning_effort))
+    not is_nil(fetch_value(body, "reasoning", "enable")) or
+      not is_nil(fetch_value(body, "reasoning", "depth")) or
+      not is_nil(fetch_value(body, "reasoning_effort"))
   end
 
   defp reasoning_contract(%LLMDB.Model{provider: provider})
@@ -2240,7 +2237,7 @@ defmodule ReqLLM.Telemetry do
     do: normalize_finish_reason(response.finish_reason)
 
   defp finish_reason_from_response(body) when is_map(body) do
-    fetch_value(body, :finish_reason)
+    fetch_value(body, "finish_reason")
     |> normalize_finish_reason()
   end
 
@@ -2319,7 +2316,7 @@ defmodule ReqLLM.Telemetry do
   defp keyword_has_key?(_data, _key), do: false
 
   defp has_value_key?(data, key) when is_map(data) do
-    Map.has_key?(data, key) or Map.has_key?(data, Atom.to_string(key))
+    Map.has_key?(data, key)
   end
 
   defp has_value_key?(data, key) when is_list(data) do
@@ -2330,18 +2327,9 @@ defmodule ReqLLM.Telemetry do
 
   defp fetch_value(data, key) do
     cond do
-      is_map(data) ->
-        cond do
-          Map.has_key?(data, key) -> Map.get(data, key)
-          Map.has_key?(data, Atom.to_string(key)) -> Map.get(data, Atom.to_string(key))
-          true -> nil
-        end
-
-      Keyword.keyword?(data) ->
-        Keyword.get(data, key)
-
-      true ->
-        nil
+      is_map(data) -> Map.get(data, key)
+      Keyword.keyword?(data) -> Keyword.get(data, key)
+      true -> nil
     end
   end
 

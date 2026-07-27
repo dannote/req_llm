@@ -173,7 +173,10 @@ defmodule ReqLLM.OpenTelemetry.ContentTest do
     test "redacts explicitly owned file IDs in content telemetry" do
       owned_part =
         ContentPart.owned_file_id("file-secret", :openai,
-          provider_metadata: %{url: "https://example.com/private", api_token: "token-secret"}
+          provider_metadata: %{
+            "url" => "https://example.com/private",
+            "api_token" => "token-secret"
+          }
         )
 
       messages = [%Message{role: :user, content: [owned_part]}]

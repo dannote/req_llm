@@ -178,7 +178,7 @@ owned_file =
     expires_at: ~U[2030-01-01 00:00:00Z],
     size: 12_345,
     sha256: "...",
-    provider_metadata: %{tenant: "documentation"}
+    provider_metadata: %{"tenant" => "documentation"}
   )
 ```
 

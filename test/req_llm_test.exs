@@ -145,14 +145,9 @@ defmodule ReqLLMTest do
                ReqLLM.model(%{id: "my-model", provider: :custom})
     end
 
-    test "creates model from map with string keys" do
-      assert {:ok, %LLMDB.Model{provider: :acme, id: "acme-chat"}} =
-               ReqLLM.model(%{"id" => "acme-chat", "provider" => :acme})
-    end
-
     test "creates model from map with provider string" do
       assert {:ok, %LLMDB.Model{provider: :openai, id: "gpt-4o"}} =
-               ReqLLM.model(%{"id" => "gpt-4o", "provider" => "openai"})
+               ReqLLM.model(%{id: "gpt-4o", provider: "openai"})
     end
 
     test "does not warn for explicit inline model specs" do

@@ -330,12 +330,12 @@ defmodule ReqLLM.Providers.OpenAITest do
       assert token_limit == model.limits.output
     end
 
-    test "prepare_request honors explicit string-key openai_chat wire protocol" do
+    test "prepare_request honors explicit openai_chat wire protocol" do
       {:ok, model} =
         ReqLLM.model(%{
           provider: :openai,
           id: "gpt-5.3-codex",
-          extra: %{"wire" => %{"protocol" => "openai_chat"}}
+          extra: %{wire: %{protocol: "openai_chat"}}
         })
 
       context = context_fixture()

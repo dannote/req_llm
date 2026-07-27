@@ -189,7 +189,7 @@ defmodule ReqLLM.Message.ContentPartTest do
           expires_at: expires_at,
           size: 12,
           sha256: "abc123",
-          provider_metadata: %{tenant: "docs"}
+          provider_metadata: %{"tenant" => "docs"}
         )
 
       assert %ContentPart{
@@ -225,9 +225,9 @@ defmodule ReqLLM.Message.ContentPartTest do
       part =
         ContentPart.owned_file_id("file-secret", :openai,
           provider_metadata: %{
-            url: "https://example.com/private",
-            api_token: "token-secret",
-            tenant: "docs"
+            "url" => "https://example.com/private",
+            "api_token" => "token-secret",
+            "tenant" => "docs"
           }
         )
 
@@ -247,30 +247,6 @@ defmodule ReqLLM.Message.ContentPartTest do
       refute inspected =~ "token-secret"
     end
 
-    test "round-trips deterministically through JSON and context normalization" do
-      part =
-        ContentPart.owned_file_id("files/report", :google,
-          purpose: "analysis",
-          status: "active",
-          provider_metadata: %{tenant: "docs"}
-        )
-
-      decoded_part = Jason.decode!(Jason.encode!(part))
-
-      assert {:ok, context} =
-               ReqLLM.Context.normalize(
-                 [%{"role" => "user", "content" => [decoded_part]}],
-                 validate: false
-               )
-
-      assert [%ReqLLM.Message{content: [normalized]}] = context.messages
-      assert normalized.file_id == "files/report"
-      assert {:ok, reference} = ContentPart.provider_file_reference(normalized)
-      assert reference["provider"] == "google"
-      assert reference["reference_id"] == "files/report"
-      assert reference["metadata"] == %{"tenant" => "docs"}
-    end
-
     test "rejects invalid lifecycle metadata" do
       assert_raise ArgumentError, ~r/expires_at/, fn ->
         ContentPart.owned_file_id("file-1", :openai, expires_at: "tomorrow")
@@ -286,7 +262,7 @@ defmodule ReqLLM.Message.ContentPartTest do
 
       assert_raise ArgumentError, ~r/JSON-safe/, fn ->
         ContentPart.owned_file_id("file-1", :openai,
-          provider_metadata: %{callback: fn -> :ok end}
+          provider_metadata: %{"callback" => fn -> :ok end}
         )
       end
     end

@@ -558,9 +558,7 @@ defmodule ReqLLM.ContextTest do
     test "converts loose maps" do
       test_cases = [
         {%{role: :user, content: "Map message"}, :user, "Map message"},
-        {%{"role" => "user", "content" => "String key message"}, :user, "String key message"},
-        {%{role: "assistant", content: "Assistant map"}, :assistant, "Assistant map"},
-        {%{"role" => "system", "content" => "System map"}, :system, "System map"}
+        {%{role: "assistant", content: "Assistant map"}, :assistant, "Assistant map"}
       ]
 
       for {input, expected_role, expected_content} <- test_cases do
@@ -668,51 +666,6 @@ defmodule ReqLLM.ContextTest do
              ] = content
     end
 
-    test "accepts JSON-decoded assistant loose maps with list content" do
-      input = %{
-        "role" => "assistant",
-        "content" => [
-          %{"type" => "thinking", "text" => "internal"},
-          %{"type" => "text", "text" => "answer"}
-        ]
-      }
-
-      {:ok, context} = Context.normalize(input, validate: false)
-
-      assert [%Message{role: :assistant, content: content}] = context.messages
-
-      assert [
-               %ContentPart{type: :thinking, text: "internal"},
-               %ContentPart{type: :text, text: "answer"}
-             ] = content
-    end
-
-    test "accepts JSON-decoded user loose maps with video_url content" do
-      input = %{
-        "role" => "user",
-        "content" => [
-          %{"type" => "text", "text" => "What happens in this video?"},
-          %{
-            "type" => "video_url",
-            "video_url" => %{"url" => "https://example.com/clip.mp4", "media_type" => "video/mp4"}
-          }
-        ]
-      }
-
-      {:ok, context} = Context.normalize(input, validate: false)
-
-      assert [%Message{role: :user, content: content}] = context.messages
-
-      assert [
-               %ContentPart{type: :text, text: "What happens in this video?"},
-               %ContentPart{
-                 type: :video_url,
-                 url: "https://example.com/clip.mp4",
-                 media_type: "video/mp4"
-               }
-             ] = content
-    end
-
     test "rejects invalid input types" do
       {:error, reason} = Context.normalize(:invalid, validate: false)
       assert reason == :invalid_prompt
@@ -722,7 +675,7 @@ defmodule ReqLLM.ContextTest do
     end
 
     test "rejects loose maps with invalid role" do
-      input = %{"role" => "invalid_role", "content" => "Test"}
+      input = %{role: "invalid_role", content: "Test"}
       {:error, reason} = Context.normalize(input, validate: false)
 
       assert %ReqLLM.Error.Invalid.Role{} = reason
@@ -1155,20 +1108,20 @@ defmodule ReqLLM.ContextTest do
     test "normalizes nested image and video url content maps" do
       input = [
         %{
-          "role" => "user",
-          "content" => [
+          role: "user",
+          content: [
             %{
-              "type" => "image_url",
-              "image_url" => %{
-                "url" => "https://example.com/image.png",
-                "media_type" => "image/png"
+              type: :image_url,
+              image_url: %{
+                url: "https://example.com/image.png",
+                media_type: "image/png"
               }
             },
             %{
-              "type" => "video_url",
-              "video_url" => %{
-                "url" => "https://example.com/video.mp4",
-                "media_type" => "video/mp4"
+              type: :video_url,
+              video_url: %{
+                url: "https://example.com/video.mp4",
+                media_type: "video/mp4"
               }
             }
           ]
@@ -1185,15 +1138,15 @@ defmodule ReqLLM.ContextTest do
     test "normalizes file_id content maps" do
       input = [
         %{
-          "role" => "user",
-          "content" => [
+          role: "user",
+          content: [
             %{
-              "type" => "document",
-              "source" => %{
-                "type" => "file",
-                "file_id" => "file_011CNha8iCJcU1wXNR6q4V8w"
+              type: :document,
+              source: %{
+                type: :file,
+                file_id: "file_011CNha8iCJcU1wXNR6q4V8w"
               },
-              "media_type" => "application/pdf"
+              media_type: "application/pdf"
             }
           ]
         }
@@ -1214,13 +1167,13 @@ defmodule ReqLLM.ContextTest do
 
       input = [
         %{
-          "role" => "user",
-          "content" => [
+          role: "user",
+          content: [
             %{
-              "type" => "file",
-              "file" => %{
-                "filename" => "document.pdf",
-                "file_data" => "data:application/pdf;base64,#{Base.encode64(pdf_data)}"
+              type: :file,
+              file: %{
+                filename: "document.pdf",
+                file_data: "data:application/pdf;base64,#{Base.encode64(pdf_data)}"
               }
             }
           ]
@@ -1240,14 +1193,14 @@ defmodule ReqLLM.ContextTest do
     test "normalizes Anthropic image file source content maps" do
       input = [
         %{
-          "role" => "user",
-          "content" => [
+          role: "user",
+          content: [
             %{
-              "type" => "image",
-              "source" => %{
-                "type" => "file",
-                "file_id" => "file_011CPMxVD3fHLUhvTqtsQA5w",
-                "media_type" => "image/png"
+              type: :image,
+              source: %{
+                type: :file,
+                file_id: "file_011CPMxVD3fHLUhvTqtsQA5w",
+                media_type: "image/png"
               }
             }
           ]

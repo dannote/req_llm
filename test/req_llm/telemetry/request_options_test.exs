@@ -51,12 +51,12 @@ defmodule ReqLLM.Telemetry.RequestOptionsTest do
                RequestOptions.extract(:sync, encoding_format: ["float", "base64"])
     end
 
-    test "reads conversation_id from telemetry opt (keyword or map, atom or string key)" do
+    test "reads conversation_id from atom-keyed telemetry options" do
       assert %{conversation_id: "tid-1"} =
                RequestOptions.extract(:sync, telemetry: [conversation_id: "tid-1"])
 
       assert %{conversation_id: "tid-2"} =
-               RequestOptions.extract(:sync, telemetry: %{"conversation_id" => "tid-2"})
+               RequestOptions.extract(:sync, telemetry: %{conversation_id: "tid-2"})
     end
 
     test "service_tier falls back to provider_options" do

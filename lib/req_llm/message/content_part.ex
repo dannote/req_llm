@@ -102,7 +102,8 @@ defmodule ReqLLM.Message.ContentPart do
   behavior.
 
   Supported options are `:media_type`, `:metadata`, `:purpose`, `:status`,
-  `:expires_at`, `:size`, `:sha256`, and `:provider_metadata`.
+  `:expires_at`, `:size`, `:sha256`, and `:provider_metadata`. Provider metadata
+  must be a JSON-safe map with string keys.
   """
   @spec owned_file_id(String.t(), atom() | String.t(), keyword()) :: t()
   def owned_file_id(file_id, provider, opts \\ []) when is_list(opts) do

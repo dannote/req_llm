@@ -99,7 +99,7 @@ defmodule ReqLLM do
   Model input accepted by ReqLLM public APIs.
 
   Strings and tuples resolve through the LLMDB catalog. `%LLMDB.Model{}` values and
-  plain maps are treated as inline model specs and bypass catalog lookup.
+  atom-keyed plain maps are treated as inline model specs and bypass catalog lookup.
   """
   @type model_input ::
           String.t()
@@ -126,10 +126,6 @@ defmodule ReqLLM do
         }
 
   @inline_model_example "%{provider: :openai, id: \"gpt-4o\"}"
-  @inline_model_fields LLMDB.Model.__struct__(provider: :openai, id: "__inline__")
-                       |> Map.from_struct()
-                       |> Map.keys()
-  @inline_model_field_strings Enum.map(@inline_model_fields, &Atom.to_string/1)
   @google_long_context_threshold 200_000
   @google_tiered_token_pricing %{
     "gemini-2.5-computer-use-preview-10-2025" => %{
@@ -270,7 +266,7 @@ defmodule ReqLLM do
 
     * `model_spec` - Model specification in various formats:
       - String format: `"anthropic:claude-3-sonnet"` (looks up in LLMDB catalog)
-      - Map format: `%{id: "my-model", provider: :my_provider}` (inline model spec)
+      - Atom-keyed map format: `%{id: "my-model", provider: :my_provider}` (inline model spec)
       - Tuple format: `{:anthropic, "claude-3-sonnet", temperature: 0.7}`
       - Model struct: `%LLMDB.Model{}`
 
@@ -292,8 +288,8 @@ defmodule ReqLLM do
       ReqLLM.generate_text(model, "Hello!")
 
   This bypasses catalog lookup, enriches the model metadata, and returns `%LLMDB.Model{}`.
-  Inline maps are accepted for backwards compatibility, but `model!/1` is the recommended
-  entry point for advanced workflows because it validates the spec up front.
+  Atom-keyed inline maps are accepted for backwards compatibility, but `model!/1` is the
+  recommended entry point for advanced workflows because it validates the spec up front.
 
   ## Examples
 
@@ -509,58 +505,43 @@ defmodule ReqLLM do
   defp normalize_model_metadata(%LLMDB.Model{} = model) do
     model
     |> sync_legacy_model_field()
-    |> normalize_catalog_extra()
+    |> normalize_catalog_family()
+    |> normalize_catalog_wire()
     |> do_normalize_model_metadata()
   end
 
-  defp normalize_catalog_extra(%LLMDB.Model{extra: extra} = model) when is_map(extra) do
-    normalized_extra =
-      extra
-      |> copy_catalog_extra_key("family", :family)
-      |> copy_catalog_extra_key("wire", :wire)
-      |> normalize_catalog_wire()
-
-    %{model | extra: normalized_extra}
+  defp normalize_catalog_family(%LLMDB.Model{extra: extra} = model)
+       when is_map(extra) and is_map_key(extra, "family") and not is_map_key(extra, :family) do
+    {family, extra} = Map.pop!(extra, "family")
+    %{model | extra: Map.put(extra, :family, family)}
   end
 
-  defp normalize_catalog_extra(%LLMDB.Model{} = model), do: model
+  defp normalize_catalog_family(%LLMDB.Model{} = model), do: model
 
-  defp copy_catalog_extra_key(extra, string_key, atom_key) do
-    case {Map.has_key?(extra, atom_key), Map.fetch(extra, string_key)} do
-      {false, {:ok, value}} -> Map.put(extra, atom_key, value)
-      _ -> extra
-    end
+  defp normalize_catalog_wire(%LLMDB.Model{extra: extra} = model)
+       when is_map(extra) and is_map_key(extra, "wire") and not is_map_key(extra, :wire) do
+    {wire, extra} = Map.pop!(extra, "wire")
+    normalize_catalog_wire(%{model | extra: Map.put(extra, :wire, wire)})
   end
 
-  defp normalize_catalog_wire(%{wire: wire} = extra) when is_map(wire) do
-    Map.put(extra, :wire, copy_catalog_extra_key(wire, "protocol", :protocol))
+  defp normalize_catalog_wire(%LLMDB.Model{extra: %{wire: wire} = extra} = model)
+       when is_map(wire) and is_map_key(wire, "protocol") and not is_map_key(wire, :protocol) do
+    {protocol, wire} = Map.pop!(wire, "protocol")
+    %{model | extra: Map.put(extra, :wire, Map.put(wire, :protocol, protocol))}
   end
 
-  defp normalize_catalog_wire(extra), do: extra
+  defp normalize_catalog_wire(%LLMDB.Model{} = model), do: model
 
   defp do_normalize_model_metadata(%LLMDB.Model{provider: :openai} = model) do
-    protocol =
-      get_in(model, [Access.key(:extra, %{}), :wire, :protocol]) ||
-        get_in(model, [Access.key(:extra, %{}), "wire", "protocol"])
+    protocol = get_in(model, [Access.key(:extra, %{}), :wire, :protocol])
 
     model_id = model.provider_model_id || model.id || model.model
 
     if is_nil(protocol) and ReqLLM.Providers.OpenAI.AdapterHelpers.responses_model?(model_id) do
       extra = model.extra || %{}
 
-      updated_extra =
-        cond do
-          Map.has_key?(extra, :wire) ->
-            wire = if is_map(extra[:wire]), do: extra[:wire], else: %{}
-            Map.put(extra, :wire, Map.put(wire, :protocol, "openai_responses"))
-
-          Map.has_key?(extra, "wire") ->
-            wire = if is_map(extra["wire"]), do: extra["wire"], else: %{}
-            Map.put(extra, "wire", Map.put(wire, "protocol", "openai_responses"))
-
-          true ->
-            Map.put(extra, :wire, %{protocol: "openai_responses"})
-        end
+      wire = if is_map(extra[:wire]), do: extra[:wire], else: %{}
+      updated_extra = Map.put(extra, :wire, Map.put(wire, :protocol, "openai_responses"))
 
       %{model | extra: updated_extra}
     else
@@ -774,18 +755,8 @@ defmodule ReqLLM do
   end
 
   defp put_wire_protocol(extra, protocol) do
-    cond do
-      Map.has_key?(extra, :wire) ->
-        wire = if is_map(extra[:wire]), do: extra[:wire], else: %{}
-        Map.put(extra, :wire, Map.put(wire, :protocol, protocol))
-
-      Map.has_key?(extra, "wire") ->
-        wire = if is_map(extra["wire"]), do: extra["wire"], else: %{}
-        Map.put(extra, "wire", Map.put(wire, "protocol", protocol))
-
-      true ->
-        Map.put(extra, :wire, %{protocol: protocol})
-    end
+    wire = if is_map(extra[:wire]), do: extra[:wire], else: %{}
+    Map.put(extra, :wire, Map.put(wire, :protocol, protocol))
   end
 
   defp mistral_inline_model_attrs(model_id) do
@@ -823,7 +794,6 @@ defmodule ReqLLM do
   end
 
   defp normalize_inline_model_attrs(attrs) do
-    attrs = atomize_inline_model_keys(attrs)
     attrs = sync_inline_model_id_and_model(attrs)
 
     cond do
@@ -844,18 +814,6 @@ defmodule ReqLLM do
       true ->
         coerce_inline_model_provider(attrs)
     end
-  end
-
-  defp atomize_inline_model_keys(attrs) do
-    Enum.reduce(attrs, attrs, fn
-      {key, value}, acc when is_binary(key) and key in @inline_model_field_strings ->
-        acc
-        |> Map.delete(key)
-        |> Map.put(String.to_existing_atom(key), value)
-
-      _, acc ->
-        acc
-    end)
   end
 
   defp sync_inline_model_id_and_model(attrs) do

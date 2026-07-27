@@ -100,13 +100,13 @@ defmodule ReqLLM.Context do
   - Message struct: wraps in Context
   - Context struct: passes through
   - List: processes each item and creates Context from all messages
-  - Loose maps: converts to Message if they have role/content keys
+  - Atom-keyed loose maps: converts to Message if they have `:role`/`:content` keys
 
   ## Options
 
     * `:system_prompt` - String to add as system message if none exists
     * `:validate` - Boolean to run validation (default: true)
-    * `:convert_loose` - Boolean to allow loose maps with role/content (default: true)
+    * `:convert_loose` - Boolean to allow atom-keyed loose maps with `:role`/`:content` (default: true)
 
   ## Examples
 
@@ -1012,83 +1012,9 @@ defmodule ReqLLM.Context do
     end
   end
 
-  defp convert_loose_map(%{"role" => role, "content" => content} = msg)
-       when is_binary(role) and is_list(content) do
-    convert_loose_role_list_content(
-      role,
-      content,
-      Map.get(msg, "metadata", %{}),
-      Map.get(msg, "reasoning_details")
-    )
-  end
-
-  defp convert_loose_map(%{"role" => role, "content" => content} = msg)
-       when is_binary(role) and is_binary(content) do
-    metadata = Map.get(msg, "metadata", %{})
-    reasoning_details = Map.get(msg, "reasoning_details")
-
-    case role do
-      "user" ->
-        {:ok, text(:user, content, metadata)}
-
-      "assistant" ->
-        {:ok,
-         text(:assistant, content, metadata) |> maybe_put_reasoning_details(reasoning_details)}
-
-      "system" ->
-        {:ok, text(:system, content, metadata)}
-
-      _ ->
-        {:error, ReqLLM.Error.Invalid.Role.exception(role: role)}
-    end
-  end
-
   defp convert_loose_map(_map), do: {:error, :invalid_loose_map}
 
   defp to_part_list(%ContentPart{} = part), do: [part]
-
-  defp to_part_list(%{"type" => type} = part) do
-    case type do
-      "text" ->
-        text = part["text"]
-
-        if is_binary(text) and text != "" do
-          [ContentPart.text(text)]
-        else
-          []
-        end
-
-      "thinking" ->
-        text = part["text"] || part["thinking"]
-
-        if is_binary(text) and text != "" do
-          [ContentPart.thinking(text)]
-        else
-          []
-        end
-
-      "image_url" ->
-        case url_content_part(part, "image_url") do
-          {:ok, url_part} -> [url_part]
-          :error -> []
-        end
-
-      "video_url" ->
-        case url_content_part(part, "video_url") do
-          {:ok, url_part} -> [url_part]
-          :error -> []
-        end
-
-      type when type in ["file", "file_id", "document", "image"] ->
-        case file_content_part(part) do
-          {:ok, file_part} -> [file_part]
-          :error -> []
-        end
-
-      _ ->
-        []
-    end
-  end
 
   defp to_part_list(%{type: type} = part) do
     case type do
@@ -1122,8 +1048,7 @@ defmodule ReqLLM.Context do
           :error -> []
         end
 
-      type
-      when type in [:file, "file", :file_id, "file_id", :document, "document", :image, "image"] ->
+      type when type in [:file, :file_id, :document, :image] ->
         case file_content_part(part) do
           {:ok, file_part} -> [file_part]
           :error -> []
@@ -1135,33 +1060,6 @@ defmodule ReqLLM.Context do
   end
 
   defp to_part_list(_part), do: []
-
-  defp url_content_part(part, kind) when is_binary(kind) do
-    metadata = part["metadata"] || %{}
-    nested = part[kind]
-
-    url =
-      part["url"] ||
-        if(is_map(nested), do: nested["url"])
-
-    media_type =
-      part["media_type"] ||
-        if(is_map(nested), do: nested["media_type"])
-
-    if is_binary(url) and url != "" do
-      atom_kind = String.to_existing_atom(kind)
-
-      content_part =
-        case atom_kind do
-          :image_url -> ContentPart.image_url(url, metadata)
-          :video_url -> ContentPart.video_url(url, metadata)
-        end
-
-      {:ok, maybe_put_url_media_type(content_part, media_type)}
-    else
-      :error
-    end
-  end
 
   defp url_content_part(part, kind) when is_atom(kind) do
     metadata = part[:metadata] || %{}
@@ -1198,28 +1096,14 @@ defmodule ReqLLM.Context do
   defp file_content_part(part) do
     metadata = file_content_metadata(part)
 
-    nested =
-      Map.get(part, :file) ||
-        Map.get(part, "file") ||
-        Map.get(part, :document) ||
-        Map.get(part, "document") ||
-        Map.get(part, :source) ||
-        Map.get(part, "source")
+    nested = Map.get(part, :file) || Map.get(part, :document) || Map.get(part, :source)
 
-    file_id =
-      Map.get(part, :file_id) ||
-        Map.get(part, "file_id") ||
-        if(is_map(nested), do: Map.get(nested, :file_id) || Map.get(nested, "file_id"))
+    file_id = Map.get(part, :file_id) || if(is_map(nested), do: Map.get(nested, :file_id))
 
     media_type =
-      Map.get(part, :media_type) ||
-        Map.get(part, "media_type") ||
-        if(is_map(nested), do: Map.get(nested, :media_type) || Map.get(nested, "media_type"))
+      Map.get(part, :media_type) || if(is_map(nested), do: Map.get(nested, :media_type))
 
-    filename =
-      Map.get(part, :filename) ||
-        Map.get(part, "filename") ||
-        if(is_map(nested), do: Map.get(nested, :filename) || Map.get(nested, "filename"))
+    filename = Map.get(part, :filename) || if(is_map(nested), do: Map.get(nested, :filename))
 
     if is_binary(file_id) and file_id != "" do
       file_part = ContentPart.file_id(file_id, media_type || "application/pdf", metadata)
@@ -1241,10 +1125,7 @@ defmodule ReqLLM.Context do
   end
 
   defp file_content_data(part, nested, media_type) do
-    data =
-      Map.get(part, :file_data) ||
-        Map.get(part, "file_data") ||
-        if(is_map(nested), do: Map.get(nested, :file_data) || Map.get(nested, "file_data"))
+    data = Map.get(part, :file_data) || if(is_map(nested), do: Map.get(nested, :file_data))
 
     case data do
       data when is_binary(data) ->
@@ -1292,10 +1173,10 @@ defmodule ReqLLM.Context do
   defp maybe_put_file_filename(%ContentPart{} = part, _filename), do: part
 
   defp file_content_metadata(part) do
-    metadata = Map.get(part, :metadata) || Map.get(part, "metadata") || %{}
+    metadata = Map.get(part, :metadata, %{})
 
     Enum.reduce([:title, :context, :citations], metadata, fn key, acc ->
-      value = Map.get(part, key) || Map.get(part, Atom.to_string(key))
+      value = Map.get(part, key)
 
       if is_nil(value) do
         acc
